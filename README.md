@@ -4,25 +4,22 @@
 
 **Windows operations MCP server: file I/O, persistent sessions, build/deploy, breadcrumb tracking, reminders, and dead-drop coordination. The `powershell` and `session_run` tools enforce a 4-tier safety blocklist for destructive commands.**
 
-Version 0.2.1 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
+Version 0.3.0 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
 
 **Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** - a multi-agent AI orchestration platform. Related repos: [local](https://github.com/AIWander/local) · [manager](https://github.com/AIWander/manager) · [hands](https://github.com/AIWander/hands) · [workflow](https://github.com/AIWander/workflow) · [cpc-paths](https://github.com/AIWander/cpc-paths) · [cpc-breadcrumbs](https://github.com/AIWander/cpc-breadcrumbs)
 
 ---
 
-## What's New in v0.2.1
+## What's New in v0.3.0
 
-v0.2.0 is the first public release of `ops`, the Windows operations MCP server for Claude Desktop.
-Originated as an internal consolidation of the `research-mcp` crate from the CPC stack.
-
-### Highlights
+### v0.3.0 highlights
 
 | Feature | Detail |
 |---------|--------|
-| 68 tools | 14 categories: file I/O, sessions, breadcrumbs, reminders, and more |
-| 4-tier command blocklist | Catastrophic patterns blocked unconditionally; graduated confirmation for destructive and system-config ops |
-| Portable paths | Default state at `%LOCALAPPDATA%\Ops\` - no hardcoded paths, no Google Drive required |
-| Companion installer | `install-ops-x64.exe` handles config backup, binary copy, and mcpServers patch |
+| `bash` tool | Execute commands via Git Bash — mirrors `powershell` with `allow_destructive` and `confirm` flags |
+| Extended blocklist | Unix-shaped T4/T3/T2 patterns: dd-to-device, fork bombs, rm -rf root, curl\|sh, chmod 777, mkfs/shred, systemctl, iptables, apt |
+| Path resolution | `OPS_BASH_PATH` env override → standard Git Bash locations → PATH fallback |
+| 69 tools total | +1 from v0.2.1 |
 
 ---
 

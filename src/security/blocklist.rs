@@ -895,7 +895,10 @@ mod tests {
     #[test]
     fn t4_unix_negative_dd_to_file() {
         // dd writing to a regular file — not a raw device
-        assert_tier("dd if=/dev/zero of=/tmp/test.img bs=1M count=100", Tier::One);
+        assert_tier(
+            "dd if=/dev/zero of=/tmp/test.img bs=1M count=100",
+            Tier::One,
+        );
     }
     #[test]
     fn t4_unix_negative_curl_no_pipe() {

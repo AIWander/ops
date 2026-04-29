@@ -715,8 +715,7 @@ fn handle_bash(_server: &Server, params: Value) -> Result<Value, String> {
         .ok_or("Missing 'command' parameter")?
         .to_string();
 
-    let working_dir =
-        resolve_working_dir(params.get("working_dir").and_then(|v| v.as_str()));
+    let working_dir = resolve_working_dir(params.get("working_dir").and_then(|v| v.as_str()));
 
     let timeout = params
         .get("timeout_secs")
