@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.1 - 2026-04-29
+
+### Changed
+- Upgraded `rusqlite` to 0.39 (bundled SQLite update + API adaptations).
+- Bumped GitHub Actions versions to v5 (checkout, upload-artifact, download-artifact) — addresses upcoming Node.js 20 deprecation.
+
+### Fixed
+- v0.2.0 tag pointed at the initial commit (pre-clippy fixes); v0.2.1 tag points at HEAD with all fixes applied.
+
 ## v0.2.0 - 2026-04-28 - First public release
 
 Initial public release of `ops`, the Windows operations MCP server for Claude Desktop.
