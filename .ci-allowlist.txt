@@ -1,0 +1,19 @@
+# CI Leakage Scanner Allowlist — ops
+# Lines starting with # are comments.
+# Entry = filename (skips entire file) or substring (skips matching lines).
+
+# CPC setup documentation — legitimately references CPC paths, Volumes, env vars
+per_machine_setup.md
+
+# Skill documentation and hooks use CPC install paths in examples
+C:\CPC\
+C:\\CPC\\
+
+# Hook files contain legitimate CPC references in error message examples
+breadcrumb_start_guard.js
+
+# ops, Ops, OPS are the correct product name — not leakage
+# (suppress false positives if the leakage scanner catches these as CPC internals)
+ops
+Ops
+OPS

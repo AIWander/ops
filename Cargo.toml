@@ -1,0 +1,27 @@
+[package]
+name = "ops"
+version = "0.2.0"
+edition = "2021"
+description = "Windows operations MCP server - file I/O, sessions, build/deploy, breadcrumbs, reminders for Claude Desktop"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/AIWander/ops"
+keywords = ["cpc", "mcp", "windows", "operations", "deploy"]
+categories = ["command-line-utilities", "filesystem", "development-tools"]
+
+[[bin]]
+name = "ops"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4"] }
+once_cell = "1"
+tokio = { version = "1", features = ["full"] }
+regex = "1"
+anyhow = "1"
+arboard = "3.2"
+rusqlite = { version = "0.29", features = ["bundled"] }
+dirs = "5"

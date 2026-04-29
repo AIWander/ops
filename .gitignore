@@ -1,0 +1,11 @@
+/target/
+*.bak
+*.swp
+*.swo
+*~
+*.pdb
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.env

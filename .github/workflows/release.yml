@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run tests
+        run: cargo test --release --locked
+        timeout-minutes: 15
+
+  build:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: x64
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            suffix: aarch64
+      fail-fast: false
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Rename binary
+        shell: pwsh
+        # Binaries are named without a version suffix so install-ops.exe --binary ops-x64.exe
+        # works without knowing the release version. Versioning comes from the GitHub release tag.
+        run: |
+          Copy-Item "target/${{ matrix.target }}/release/ops.exe" "ops-${{ matrix.suffix }}.exe"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops-${{ matrix.suffix }}
+          path: ops-${{ matrix.suffix }}.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+          draft: true
+          prerelease: false
+          fail_on_unmatched_files: true
+          body: |
+            ## Release assets
+
+            | File | Platform | Notes |
+            |------|----------|-------|
+            | `ops-x64.exe` | Windows x64 | Main server binary |
+            | `ops-aarch64.exe` | Windows ARM64 | Main server binary |
+            | `install-ops-x64.exe` | Windows x64 | **Companion installer** - manually attached after CI |
+
+            ### Quick install (x64)
+
+            Download `ops-x64.exe` and `install-ops-x64.exe`, place them in the same directory, then run:
+
+            ```
+            install-ops-x64.exe --binary ops-x64.exe
+            ```
+
+            ### Companion installer
+
+            `install-ops-x64.exe` is built separately from the `ops-installer` companion crate
+            and manually attached to each release. It backs up your Claude Desktop config,
+            copies `ops.exe` to the chosen location, and registers the server - all in one step.
+
+            ARM64 installer is not yet available; ARM64 users should edit
+            `claude_desktop_config.json` manually (see `claude_desktop_config.example.json`).
+
+            ### Build from source
+
+            ```bash
+            git clone https://github.com/AIWander/ops.git
+            cd ops
+            cargo build --release
+            ```
+
+            <!-- TODO v0.2.1: automate installer build and attach in this workflow.
+                 The ops-installer crate lives at ops-installer/ in the source repo.
+                 Build with: cargo build --release -p ops-installer
+                 Then upload install-ops-x64.exe as a release asset alongside the main binaries. -->
