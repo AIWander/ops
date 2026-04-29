@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.0 — 2026-04-29
+
+### Added
+- New `bash` tool — execute commands via Git Bash, mirrors `powershell` semantics with `allow_destructive` and `confirm` flags. Falls back to PATH if Git Bash not at standard location; honors `OPS_BASH_PATH` env override.
+- Extended command blocklist with Unix-shaped patterns: dd-to-device, fork bombs, `rm -rf` of root or system dirs, `curl | sh`, `chmod 777` on system paths, mkfs/shred on raw devices, systemctl/service/iptables/ufw/crontab/visudo/package-manager guards.
+
+### Changed
+- Tool count: 68 → 69.
+
 ## v0.2.1 - 2026-04-29
 
 ### Changed

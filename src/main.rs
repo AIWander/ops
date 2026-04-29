@@ -133,6 +133,21 @@ fn get_tools_list() -> Value {
             }
         },
         {
+            "name": "bash",
+            "description": "Execute a bash command via Git Bash. Most commands run freely. Destructive commands require explicit user permission: pass `confirm: true` for service/firewall/scheduled-task/registry changes; pass `allow_destructive: true` for format/account-deletion/bulk-system-delete/dd-to-device operations. Catastrophic patterns (raw disk writes, fork bombs, system-root recursive delete, curl-pipe-shell from network, BitLocker disable) are blocked unconditionally. Working directory defaults to the caller's cwd, or %LOCALAPPDATA%\\Ops.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "The bash command to execute. Multi-line commands supported."},
+                    "working_dir": {"type": "string", "description": "Optional working directory. Default: current process cwd, falling back to %LOCALAPPDATA%/Ops."},
+                    "timeout_secs": {"type": "integer", "description": "Timeout in seconds. Default: 30. Maximum: 600.", "default": 30},
+                    "allow_destructive": {"type": "boolean", "description": "Bypass Tier 3 destructive-command guards. Default: false.", "default": false},
+                    "confirm": {"type": "boolean", "description": "Bypass Tier 2 state-changing-command guards. Default: false.", "default": false}
+                },
+                "required": ["command"]
+            }
+        },
+        {
             "name": "archive_create",
             "description": "Create zip/tar/tar.gz archive.",
             "inputSchema": {"type": "object", "properties": {"output": {"type": "string"}, "paths": {"type": "array", "items": {"type": "string"}}, "format": {"type": "string"}}, "required": ["output", "paths"]}
@@ -589,6 +604,154 @@ fn handle_powershell(_server: &Server, params: Value) -> Result<Value, String> {
     Ok(result)
 }
 
+fn resolve_bash() -> Result<PathBuf, String> {
+    if let Ok(p) = std::env::var("OPS_BASH_PATH") {
+        let pb = std::path::PathBuf::from(&p);
+        if pb.exists() {
+            return Ok(pb);
+        }
+        return Err(format!(
+            "OPS_BASH_PATH set to {} but file does not exist",
+            p
+        ));
+    }
+    let mut candidates = vec![
+        PathBuf::from(r"C:\Program Files\Git\bin\bash.exe"),
+        PathBuf::from(r"C:\Program Files (x86)\Git\bin\bash.exe"),
+    ];
+    if let Ok(local_appdata) = std::env::var("LOCALAPPDATA") {
+        candidates.push(
+            PathBuf::from(local_appdata)
+                .join("Programs")
+                .join("Git")
+                .join("bin")
+                .join("bash.exe"),
+        );
+    }
+    for c in &candidates {
+        if c.exists() {
+            return Ok(c.clone());
+        }
+    }
+    if let Ok(path_env) = std::env::var("PATH") {
+        for dir in path_env.split(';') {
+            let candidate = PathBuf::from(dir).join("bash.exe");
+            if candidate.exists() {
+                return Ok(candidate);
+            }
+        }
+    }
+    Err("Git Bash not found. Install Git for Windows from https://git-scm.com/download/win or set OPS_BASH_PATH.".to_string())
+}
+
+fn resolve_working_dir(passed: Option<&str>) -> PathBuf {
+    if let Some(p) = passed {
+        let pb = PathBuf::from(p);
+        if pb.is_dir() {
+            return pb;
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        return cwd;
+    }
+    if let Some(local) = dirs::data_local_dir() {
+        return local.join("Ops");
+    }
+    PathBuf::from(".")
+}
+
+fn handle_bash(_server: &Server, params: Value) -> Result<Value, String> {
+    use crate::security::blocklist::{check, classify, log_audit, Guard};
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
+    let allow_destructive = params
+        .get("allow_destructive")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let confirm = params
+        .get("confirm")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let cmd = params.get("command").and_then(|v| v.as_str()).unwrap_or("");
+
+    match check(cmd, allow_destructive, confirm) {
+        Guard::Refuse {
+            error_kind,
+            tier,
+            reason,
+            matched,
+            guidance,
+        } => {
+            let m = classify(cmd);
+            log_audit("bash", &m, "blocked", cmd);
+            return Ok(json!({
+                "error": error_kind,
+                "tier": tier,
+                "reason": reason,
+                "matched": matched,
+                "guidance": guidance,
+            }));
+        }
+        Guard::Allow => {
+            let m = classify(cmd);
+            let outcome = match m.tier {
+                crate::security::blocklist::Tier::Two => "allowed_with_confirm",
+                crate::security::blocklist::Tier::Three => "allowed_with_destructive",
+                _ => "",
+            };
+            if !outcome.is_empty() {
+                log_audit("bash", &m, outcome, cmd);
+            }
+        }
+    }
+
+    let bash_bin = resolve_bash()?;
+
+    let command = params
+        .get("command")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing 'command' parameter")?
+        .to_string();
+
+    let working_dir =
+        resolve_working_dir(params.get("working_dir").and_then(|v| v.as_str()));
+
+    let timeout = params
+        .get("timeout_secs")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(30)
+        .min(600);
+
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let result = std::process::Command::new(&bash_bin)
+            .args(["-c", &command])
+            .current_dir(&working_dir)
+            .output();
+        let _ = tx.send(result);
+    });
+
+    let output = rx
+        .recv_timeout(Duration::from_secs(timeout))
+        .map_err(|_| format!("Bash command timed out after {} seconds", timeout))?
+        .map_err(|e| format!("Failed to execute bash: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    let mut result = json!({
+        "success": output.status.success(),
+        "stdout": stdout.trim(),
+        "exit_code": output.status.code()
+    });
+    if !stderr.trim().is_empty() {
+        result["stderr"] = json!(stderr.trim());
+    }
+    Ok(result)
+}
+
 fn handle_archive_create(_server: &Server, params: Value) -> Result<Value, String> {
     let output = params["output"].as_str().ok_or("output required")?;
     let paths = params["paths"].as_array().ok_or("paths required")?;
@@ -693,6 +856,7 @@ fn handle_tool_call(server: &Server, name: &str, params: Value) -> Result<Value,
         "deploy_preflight" | "preflight_deploy" => handle_preflight_deploy(server, params),
         "deploy_smoke_test" | "smoke_test" => handle_smoke_test(server, params),
         "powershell" => handle_powershell(server, params),
+        "bash" => handle_bash(server, params),
         "archive_create" => handle_archive_create(server, params),
         "archive_extract" => handle_archive_extract(server, params),
         "md2docx" => handle_md2docx(server, params),
@@ -717,7 +881,7 @@ fn main() {
     // Without this, `ops.exe --version` hangs waiting for JSON-RPC input.
     let argv: Vec<String> = std::env::args().collect();
     if argv.iter().any(|a| a == "--version" || a == "-V") {
-        println!("ops 0.2.0");
+        println!("ops 0.3.0");
         return;
     }
 
@@ -785,7 +949,7 @@ fn main() {
                     id: request.id,
                     result: json!({
                         "protocolVersion": "2024-11-05",
-                        "serverInfo": {"name": "ops", "version": "0.2.0"},
+                        "serverInfo": {"name": "ops", "version": "0.3.0"},
                         "capabilities": {"tools": {}}
                     }),
                 }
