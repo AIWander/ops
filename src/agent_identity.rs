@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -260,7 +261,7 @@ fn apply_writer_value(seed: &mut IdentitySeed, value: Option<&Value>, prefix: &s
 }
 
 fn load_state_json() -> Option<Value> {
-    let content = fs::read_to_string(&state_file()).ok()?;
+    let content = fs::read_to_string(state_file()).ok()?;
     serde_json::from_str::<Value>(&content).ok()
 }
 

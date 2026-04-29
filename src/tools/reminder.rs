@@ -77,7 +77,7 @@ fn parse_due(input: &str) -> Result<DateTime<Utc>> {
 
     // Relative: "in X hours/minutes/days"
     if s.starts_with("in ") {
-        let parts: Vec<&str> = s[3..].split_whitespace().collect();
+        let parts: Vec<&str> = s.strip_prefix("in ").unwrap_or("").split_whitespace().collect();
         if parts.len() >= 2 {
             if let Ok(n) = parts[0].parse::<i64>() {
                 let unit = parts[1];
@@ -110,7 +110,7 @@ fn parse_due(input: &str) -> Result<DateTime<Utc>> {
         if s.contains(name) {
             let mut target = now + Duration::days(1);
             while target.weekday() != *wd {
-                target = target + Duration::days(1);
+                target += Duration::days(1);
             }
             let time = extract_time_from_str(&s).unwrap_or(NaiveTime::from_hms_opt(9, 0, 0).unwrap());
             let dt = target.date_naive().and_time(time);

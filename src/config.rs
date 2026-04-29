@@ -3,6 +3,7 @@
 use once_cell::sync::Lazy;
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 pub struct Config {
     pub volumes_path: String,
     pub data_dir: PathBuf,

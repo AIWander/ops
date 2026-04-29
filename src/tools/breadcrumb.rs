@@ -294,6 +294,7 @@ fn save_fingerprint(op: &Operation, duration_secs: f64, summary: &str) -> Result
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn get_efficiency_baseline(args: Value) -> Result<Value> {
     let task_type = args.get("task_type").and_then(|v| v.as_str()).unwrap_or("general");
     let path = fingerprint_path();
@@ -437,11 +438,7 @@ pub async fn step(args: Value) -> Result<Value> {
         "transcript_entries": transcript_entries
     })).await.unwrap_or(json!({ "accepted": 0, "extracted": 0 }));
 
-    let remaining = if op.current_step < op.total_steps {
-        op.total_steps - op.current_step
-    } else {
-        0
-    };
+    let remaining = op.total_steps.saturating_sub(op.current_step);
 
     Ok(json!({
         "step_completed": step_name,

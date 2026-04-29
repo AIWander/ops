@@ -1,4 +1,5 @@
-//! Extraction stub — ops does not run the full extraction stack.
+//! Extraction stub - ops does not run the full extraction stack.
+#![allow(dead_code)]
 use anyhow::Result;
 use serde_json::{json, Value};
 

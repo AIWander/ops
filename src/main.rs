@@ -505,7 +505,7 @@ fn handle_archive_create(_server: &Server, params: Value) -> Result<Value, Strin
             path_list.join("','"), output, output),
         _ => format!("tar -cf '{}' {}; Write-Output 'Created: {}'", output, path_list.join(" "), output),
     };
-    let out = std::process::Command::new("powershell").args(&["-NoProfile", "-Command", &ps_cmd])
+    let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", &ps_cmd])
         .output().map_err(|e| e.to_string())?;
     Ok(json!({"success": out.status.success(), "stdout": String::from_utf8_lossy(&out.stdout).trim().to_string(), "stderr": String::from_utf8_lossy(&out.stderr).trim().to_string()}))
 }
@@ -520,7 +520,7 @@ fn handle_archive_extract(_server: &Server, params: Value) -> Result<Value, Stri
     } else {
         format!("tar -xf '{}' -C '{}' 2>&1; Write-Output 'Extracted to: {}'", archive, dest, dest)
     };
-    let out = std::process::Command::new("powershell").args(&["-NoProfile", "-Command", &ps_cmd])
+    let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", &ps_cmd])
         .output().map_err(|e| e.to_string())?;
     Ok(json!({"success": out.status.success(), "stdout": String::from_utf8_lossy(&out.stdout).trim().to_string(), "stderr": String::from_utf8_lossy(&out.stderr).trim().to_string()}))
 }
@@ -530,7 +530,7 @@ fn handle_md2docx(_server: &Server, params: Value) -> Result<Value, String> {
     let output = params["output"].as_str().ok_or("output required")?;
     let ps_cmd = format!("pandoc '{}' -o '{}' 2>&1; if ($?) {{ Write-Output 'Converted: {} -> {}' }}",
         input, output, input, output);
-    let out = std::process::Command::new("powershell").args(&["-NoProfile", "-Command", &ps_cmd])
+    let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", &ps_cmd])
         .output().map_err(|e| e.to_string())?;
     Ok(json!({"success": out.status.success(), "stdout": String::from_utf8_lossy(&out.stdout).trim().to_string(), "stderr": String::from_utf8_lossy(&out.stderr).trim().to_string()}))
 }
@@ -547,7 +547,7 @@ fn handle_search_files(_server: &Server, params: Value) -> Result<Value, String>
             "Get-ChildItem -Path '{}' -Recurse -File -Filter '*{}*' -EA SilentlyContinue | Select-Object -First 50 | ForEach-Object {{ $_.FullName }}",
             path, pattern),
     };
-    let out = std::process::Command::new("powershell").args(&["-NoProfile", "-Command", &ps_cmd])
+    let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", &ps_cmd])
         .output().map_err(|e| e.to_string())?;
     let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
     let results: Vec<&str> = stdout.lines().collect();
@@ -556,7 +556,7 @@ fn handle_search_files(_server: &Server, params: Value) -> Result<Value, String>
 
 fn handle_system_info(_server: &Server, _params: Value) -> Result<Value, String> {
     let out = std::process::Command::new("powershell")
-        .args(&["-NoProfile", "-Command",
+        .args(["-NoProfile", "-Command",
             "Get-CimInstance Win32_OperatingSystem | ForEach-Object { Write-Output ('OS: ' + $_.Caption + ' ' + $_.Version + ' | RAM: ' + [math]::Round($_.FreePhysicalMemory/1MB,1).ToString() + '/' + [math]::Round($_.TotalVisibleMemorySize/1MB,1).ToString() + ' GB free') }; Get-CimInstance Win32_Processor | Select-Object -First 1 | ForEach-Object { Write-Output ('CPU: ' + $_.Name + ' (' + $_.NumberOfCores + ' cores)') }; Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object { Write-Output ('Disk: ' + $_.DeviceID + ' ' + [math]::Round($_.FreeSpace/1GB,1).ToString() + '/' + [math]::Round($_.Size/1GB,1).ToString() + 'GB') }"
         ])
         .output().map_err(|e| e.to_string())?;

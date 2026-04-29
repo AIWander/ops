@@ -1,4 +1,5 @@
 //! state.json - Unified state file with additive writer attribution metadata.
+#![allow(dead_code)]
 //! Single source of truth read by dashboard and autonomous:boot.
 //! Each tool updates only its own section via update_section().
 
@@ -19,7 +20,7 @@ fn state_file() -> std::path::PathBuf {
 
 /// Read full state, or create default if missing
 pub fn read_state() -> Value {
-    if let Ok(content) = fs::read_to_string(&state_file()) {
+    if let Ok(content) = fs::read_to_string(state_file()) {
         if let Ok(mut val) = serde_json::from_str::<Value>(&content) {
             ensure_state_schema(&mut val);
             return val;
@@ -440,10 +441,7 @@ pub fn check_extraction_due(tool_name: &str) -> Option<Value> {
     let mut state = read_state();
     let session = state.get_mut("session").and_then(|s| s.as_object_mut());
 
-    let session = match session {
-        Some(s) => s,
-        None => return None,
-    };
+    let session = session?;
 
     let tools_used = session
         .get("tools_used")
