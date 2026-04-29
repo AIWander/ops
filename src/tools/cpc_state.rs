@@ -97,18 +97,24 @@ fn ensure_state_schema(state: &mut Value) {
         *meta = json!({});
     }
     if let Some(meta_obj) = meta.as_object_mut() {
-        meta_obj.entry("last_writer".to_string()).or_insert(Value::Null);
+        meta_obj
+            .entry("last_writer".to_string())
+            .or_insert(Value::Null);
         meta_obj
             .entry("sections".to_string())
             .or_insert_with(|| json!({}));
     }
 
-    let operation = obj.entry("operation".to_string()).or_insert_with(|| json!({}));
+    let operation = obj
+        .entry("operation".to_string())
+        .or_insert_with(|| json!({}));
     if !operation.is_object() {
         *operation = json!({});
     }
     if let Some(operation_obj) = operation.as_object_mut() {
-        operation_obj.entry("active".to_string()).or_insert(Value::Null);
+        operation_obj
+            .entry("active".to_string())
+            .or_insert(Value::Null);
         operation_obj
             .entry("last_completed".to_string())
             .or_insert(Value::Null);
@@ -120,7 +126,9 @@ fn ensure_state_schema(state: &mut Value) {
             .or_insert(Value::Null);
     }
 
-    let session = obj.entry("session".to_string()).or_insert_with(|| json!({}));
+    let session = obj
+        .entry("session".to_string())
+        .or_insert_with(|| json!({}));
     if !session.is_object() {
         *session = json!({});
     }
@@ -129,7 +137,9 @@ fn ensure_state_schema(state: &mut Value) {
         session_obj
             .entry("started_at".to_string())
             .or_insert(Value::Null);
-        session_obj.entry("topic".to_string()).or_insert(Value::Null);
+        session_obj
+            .entry("topic".to_string())
+            .or_insert(Value::Null);
         session_obj.entry("turns".to_string()).or_insert(json!(0));
         session_obj
             .entry("tools_used".to_string())
@@ -184,9 +194,9 @@ fn ensure_state_schema(state: &mut Value) {
         health_obj
             .entry("servers".to_string())
             .or_insert_with(|| json!({}));
-        health_obj.entry("ollama".to_string()).or_insert_with(|| {
-            json!({"status": "unknown", "models": [], "ram_gb": null})
-        });
+        health_obj
+            .entry("ollama".to_string())
+            .or_insert_with(|| json!({"status": "unknown", "models": [], "ram_gb": null}));
     }
 
     let extractions = obj
@@ -246,7 +256,9 @@ fn ensure_state_schema(state: &mut Value) {
             .or_insert(Value::Null);
     }
 
-    let context = obj.entry("context".to_string()).or_insert_with(|| json!({}));
+    let context = obj
+        .entry("context".to_string())
+        .or_insert_with(|| json!({}));
     if !context.is_object() {
         *context = json!({});
     }
@@ -321,7 +333,10 @@ fn stamp_state_write(state: &mut Value, section: Option<&str>, args: Option<&Val
 
     if let Some(session_obj) = obj.get_mut("session").and_then(|v| v.as_object_mut()) {
         session_obj.insert("last_writer".to_string(), writer.clone());
-        if matches!(section, Some("session") | Some("self_state") | Some("operation")) {
+        if matches!(
+            section,
+            Some("session") | Some("self_state") | Some("operation")
+        ) {
             session_obj.insert("current_agent".to_string(), json!(writer_actor.clone()));
             if let Some(thread_id) = writer.get("thread_id").cloned() {
                 if !thread_id.is_null() {
@@ -337,7 +352,9 @@ fn stamp_state_write(state: &mut Value, section: Option<&str>, args: Option<&Val
                 .entry("contributors".to_string())
                 .or_insert_with(|| json!([]));
             if let Some(arr) = contributors.as_array_mut() {
-                let exists = arr.iter().any(|item| item.as_str() == Some(writer_actor.as_str()));
+                let exists = arr
+                    .iter()
+                    .any(|item| item.as_str() == Some(writer_actor.as_str()));
                 if !exists {
                     arr.push(json!(writer_actor.clone()));
                 }

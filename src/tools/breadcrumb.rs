@@ -92,7 +92,10 @@ fn save_checkpoint(op: &Operation) {
         "files_modified": op.files_changed,
         "last_checkpoint": chrono::Local::now().to_rfc3339(),
     });
-    let _ = std::fs::write(checkpoint_path(), serde_json::to_string_pretty(&checkpoint).unwrap_or_default());
+    let _ = std::fs::write(
+        checkpoint_path(),
+        serde_json::to_string_pretty(&checkpoint).unwrap_or_default(),
+    );
 }
 
 fn clear_checkpoint() {
@@ -215,7 +218,8 @@ fn sync_operation_state(op: Option<&Operation>, completed: Option<Value>, args: 
 
 fn fingerprint_path() -> PathBuf {
     let root = breadcrumb_root();
-    let learning = root.parent()
+    let learning = root
+        .parent()
         .map(|p| p.join("learning"))
         .unwrap_or_else(|| root.join("learning"));
     let _ = std::fs::create_dir_all(&learning);
@@ -247,23 +251,35 @@ fn save_fingerprint(op: &Operation, duration_secs: f64, summary: &str) -> Result
     let task_type = classify_task_type(&op.name);
 
     // Extract tool sequence from step names/results
-    let tool_sequence: Vec<String> = op.step_results.iter().map(|sr| {
-        // Try to extract a tool-like name from the step name
-        sr.step.clone()
-    }).collect();
+    let tool_sequence: Vec<String> = op
+        .step_results
+        .iter()
+        .map(|sr| {
+            // Try to extract a tool-like name from the step name
+            sr.step.clone()
+        })
+        .collect();
 
     // Count dead ends: steps with error/failed/retry in result
-    let dead_ends = op.step_results.iter().filter(|sr| {
-        let r = sr.result.to_lowercase();
-        r.contains("error") || r.contains("failed") || r.contains("retry")
-    }).count();
+    let dead_ends = op
+        .step_results
+        .iter()
+        .filter(|sr| {
+            let r = sr.result.to_lowercase();
+            r.contains("error") || r.contains("failed") || r.contains("retry")
+        })
+        .count();
 
     // Count backtracks: same step name appearing more than once
     let mut step_counts: HashMap<&str, usize> = HashMap::new();
     for sr in &op.step_results {
         *step_counts.entry(sr.step.as_str()).or_insert(0) += 1;
     }
-    let backtrack_count: usize = step_counts.values().filter(|&&c| c > 1).map(|c| c - 1).sum();
+    let backtrack_count: usize = step_counts
+        .values()
+        .filter(|&&c| c > 1)
+        .map(|c| c - 1)
+        .sum();
 
     let fingerprint = json!({
         "task_type": task_type,
@@ -296,11 +312,16 @@ fn save_fingerprint(op: &Operation, duration_secs: f64, summary: &str) -> Result
 
 #[allow(dead_code)]
 pub async fn get_efficiency_baseline(args: Value) -> Result<Value> {
-    let task_type = args.get("task_type").and_then(|v| v.as_str()).unwrap_or("general");
+    let task_type = args
+        .get("task_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("general");
     let path = fingerprint_path();
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
-        Err(_) => return Ok(json!({ "status": "no_data", "message": "No fingerprints recorded yet" })),
+        Err(_) => {
+            return Ok(json!({ "status": "no_data", "message": "No fingerprints recorded yet" }))
+        }
     };
 
     let mut matching: Vec<Value> = content
@@ -319,20 +340,31 @@ pub async fn get_efficiency_baseline(args: Value) -> Result<Value> {
     }
 
     let count = matching.len() as f64;
-    let avg_steps = matching.iter()
+    let avg_steps = matching
+        .iter()
         .filter_map(|v| v.get("total_steps").and_then(|s| s.as_f64()))
-        .sum::<f64>() / count;
-    let avg_duration = matching.iter()
+        .sum::<f64>()
+        / count;
+    let avg_duration = matching
+        .iter()
         .filter_map(|v| v.get("duration_seconds").and_then(|s| s.as_f64()))
-        .sum::<f64>() / count;
+        .sum::<f64>()
+        / count;
 
     // Best sequence: completed outcome with lowest steps
     matching.sort_by(|a, b| {
-        let sa = a.get("total_steps").and_then(|s| s.as_u64()).unwrap_or(u64::MAX);
-        let sb = b.get("total_steps").and_then(|s| s.as_u64()).unwrap_or(u64::MAX);
+        let sa = a
+            .get("total_steps")
+            .and_then(|s| s.as_u64())
+            .unwrap_or(u64::MAX);
+        let sb = b
+            .get("total_steps")
+            .and_then(|s| s.as_u64())
+            .unwrap_or(u64::MAX);
         sa.cmp(&sb)
     });
-    let best = matching.iter()
+    let best = matching
+        .iter()
         .find(|v| v.get("outcome").and_then(|o| o.as_str()) == Some("completed"));
     let best_sequence = best
         .and_then(|v| v.get("tool_sequence"))
@@ -350,10 +382,18 @@ pub async fn get_efficiency_baseline(args: Value) -> Result<Value> {
 }
 
 pub async fn start(args: Value) -> Result<Value> {
-    let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("unnamed");
-    let steps: Vec<String> = args.get("steps")
+    let name = args
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unnamed");
+    let steps: Vec<String> = args
+        .get("steps")
         .and_then(|v| v.as_array())
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
 
     if load_active().is_some() {
@@ -382,7 +422,9 @@ pub async fn start(args: Value) -> Result<Value> {
         "operation": name,
         "stage": "start",
         "transcript_entries": crate::tools::transcripts::transcript_recent(8)
-    })).await.unwrap_or(json!({ "accepted": 0, "extracted": 0 }));
+    }))
+    .await
+    .unwrap_or(json!({ "accepted": 0, "extracted": 0 }));
 
     Ok(json!({
         "status": "started",
@@ -395,15 +437,22 @@ pub async fn start(args: Value) -> Result<Value> {
 
 pub async fn step(args: Value) -> Result<Value> {
     let result_text = args.get("result").and_then(|v| v.as_str()).unwrap_or("");
-    let files: Vec<String> = args.get("files_changed")
+    let files: Vec<String> = args
+        .get("files_changed")
         .and_then(|v| v.as_array())
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
 
     let mut op = load_active().ok_or_else(|| anyhow::anyhow!("No active operation"))?;
     let step_writer = agent_identity::identity_from_args(Some(&args));
 
-    let step_name = op.steps.get(op.current_step)
+    let step_name = op
+        .steps
+        .get(op.current_step)
         .cloned()
         .unwrap_or_else(|| format!("step_{}", op.current_step + 1));
 
@@ -423,11 +472,15 @@ pub async fn step(args: Value) -> Result<Value> {
     save_active(&op)?;
     save_checkpoint(&op);
     sync_operation_state(Some(&op), None, Some(&args));
-    log_event("step", &op, json!({
-        "step": step_name,
-        "result": result_text,
-        "files_changed": op.files_changed
-    }));
+    log_event(
+        "step",
+        &op,
+        json!({
+            "step": step_name,
+            "result": result_text,
+            "files_changed": op.files_changed
+        }),
+    );
 
     let auto_capture = crate::tools::extraction::auto_capture_project_signals(json!({
         "operation": op.name,
@@ -436,7 +489,9 @@ pub async fn step(args: Value) -> Result<Value> {
         "result": result_text,
         "files_changed": op.step_results.last().map(|s| s.files.clone()).unwrap_or_default(),
         "transcript_entries": transcript_entries
-    })).await.unwrap_or(json!({ "accepted": 0, "extracted": 0 }));
+    }))
+    .await
+    .unwrap_or(json!({ "accepted": 0, "extracted": 0 }));
 
     let remaining = op.total_steps.saturating_sub(op.current_step);
 
@@ -475,14 +530,18 @@ pub async fn complete(args: Value) -> Result<Value> {
             "operation": op,
             "summary": summary,
             "completed_at": chrono::Local::now().to_rfc3339()
-        }))?
+        }))?,
     )?;
 
-    log_event("complete", &op, json!({
-        "summary": summary,
-        "steps_completed": op.step_results.len(),
-        "files_changed": op.files_changed
-    }));
+    log_event(
+        "complete",
+        &op,
+        json!({
+            "summary": summary,
+            "steps_completed": op.step_results.len(),
+            "files_changed": op.files_changed
+        }),
+    );
     sync_operation_state(
         None,
         Some(json!({
@@ -505,7 +564,9 @@ pub async fn complete(args: Value) -> Result<Value> {
         "summary": summary,
         "files_changed": op.files_changed,
         "transcript_entries": transcript_entries
-    })).await.unwrap_or(json!({ "accepted": 0, "extracted": 0 }));
+    }))
+    .await
+    .unwrap_or(json!({ "accepted": 0, "extracted": 0 }));
 
     // Save process fingerprint for learning (non-fatal)
     let _ = save_fingerprint(&op, duration_secs, summary);
@@ -546,18 +607,23 @@ pub async fn abort(args: Value) -> Result<Value> {
 pub async fn status(_args: Value) -> Result<Value> {
     match load_active() {
         Some(op) => {
-            let last_activity = op.step_results.last()
+            let last_activity = op
+                .step_results
+                .last()
                 .map(|s| s.completed_at.clone())
                 .unwrap_or_else(|| op.started_at.clone());
 
             // Check if modified files still exist
-            let files_verified = op.files_changed.iter().all(|f| {
-                std::path::Path::new(f).exists()
-            });
+            let files_verified = op
+                .files_changed
+                .iter()
+                .all(|f| std::path::Path::new(f).exists());
 
-            let completed_summaries: Vec<Value> = op.step_results.iter().map(|s| {
-                json!({"step": s.step, "result": s.result})
-            }).collect();
+            let completed_summaries: Vec<Value> = op
+                .step_results
+                .iter()
+                .map(|s| json!({"step": s.step, "result": s.result}))
+                .collect();
 
             let remaining_steps: Vec<&String> = op.steps[op.current_step..].iter().collect();
 
@@ -577,8 +643,8 @@ pub async fn status(_args: Value) -> Result<Value> {
                 "recovery_available": op.current_step > 0,
                 "resume_from_step": op.current_step
             }))
-        },
-        None => Ok(json!({ "active": false }))
+        }
+        None => Ok(json!({ "active": false })),
     }
 }
 

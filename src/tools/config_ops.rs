@@ -33,7 +33,9 @@ pub fn execute(name: &str, _args: &Value) -> Value {
         "config_backup" => {
             let src = match config_path() {
                 Some(p) => p,
-                None => return json!({"success": false, "error": "APPDATA environment variable not set"}),
+                None => {
+                    return json!({"success": false, "error": "APPDATA environment variable not set"})
+                }
             };
             if !src.exists() {
                 return json!({"success": false, "error": format!("Config not found: {}", src.display())});
@@ -41,7 +43,9 @@ pub fn execute(name: &str, _args: &Value) -> Value {
             let ts = Local::now().format("%Y%m%d_%H%M%S");
             let parent = match src.parent() {
                 Some(p) => p.to_path_buf(),
-                None => return json!({"success": false, "error": "Cannot determine config directory"}),
+                None => {
+                    return json!({"success": false, "error": "Cannot determine config directory"})
+                }
             };
             let backup = parent.join(format!("claude_desktop_config.backup-{}.json", ts));
             match std::fs::copy(&src, &backup) {
@@ -52,14 +56,18 @@ pub fn execute(name: &str, _args: &Value) -> Value {
         "config_validate" => {
             let path = match config_path() {
                 Some(p) => p,
-                None => return json!({"success": false, "valid": false, "error": "APPDATA environment variable not set"}),
+                None => {
+                    return json!({"success": false, "valid": false, "error": "APPDATA environment variable not set"})
+                }
             };
             if !path.exists() {
                 return json!({"success": false, "valid": false, "error": format!("Config not found: {}", path.display())});
             }
             let content = match std::fs::read_to_string(&path) {
                 Ok(c) => c,
-                Err(e) => return json!({"success": false, "valid": false, "error": format!("Read error: {}", e)}),
+                Err(e) => {
+                    return json!({"success": false, "valid": false, "error": format!("Read error: {}", e)})
+                }
             };
             match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(val) => {
@@ -77,7 +85,9 @@ pub fn execute(name: &str, _args: &Value) -> Value {
                         "path": path.to_string_lossy()
                     })
                 }
-                Err(e) => json!({"success": false, "valid": false, "error": format!("JSON parse error: {}", e)}),
+                Err(e) => {
+                    json!({"success": false, "valid": false, "error": format!("JSON parse error: {}", e)})
+                }
             }
         }
         _ => json!({"error": format!("Unknown config tool: {}", name)}),

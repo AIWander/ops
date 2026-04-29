@@ -151,9 +151,17 @@ fn read_search(path: &str, pattern: &str) -> Value {
     }
 
     if matches.is_empty() {
-        json!(format!("[NO MATCHES] '{}' not found in {} lines", pattern, total_lines))
+        json!(format!(
+            "[NO MATCHES] '{}' not found in {} lines",
+            pattern, total_lines
+        ))
     } else {
-        json!(format!("[{} matches in {} lines]\n{}", matches.len(), total_lines, matches.join("\n")))
+        json!(format!(
+            "[{} matches in {} lines]\n{}",
+            matches.len(),
+            total_lines,
+            matches.join("\n")
+        ))
     }
 }
 
@@ -184,10 +192,18 @@ fn read_lines(path: &str, range: &str) -> Value {
                 result.push(format!("{}:{}", line_num, text));
             }
         }
-        if line_num > end { break; }
+        if line_num > end {
+            break;
+        }
     }
 
-    json!(format!("[Lines {}-{} of {}]\n{}", start, end.min(total_lines), total_lines, result.join("\n")))
+    json!(format!(
+        "[Lines {}-{} of {}]\n{}",
+        start,
+        end.min(total_lines),
+        total_lines,
+        result.join("\n")
+    ))
 }
 
 fn write_file(args: &Value) -> Value {
@@ -206,7 +222,11 @@ fn append_file(args: &Value) -> Value {
     let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
     let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
     use std::io::Write;
-    match std::fs::OpenOptions::new().create(true).append(true).open(path) {
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
         Ok(mut file) => match file.write_all(content.as_bytes()) {
             Ok(_) => json!(format!("appended: {}", path)),
             Err(e) => json!(format!("[ERROR] {}", e)),
@@ -224,7 +244,9 @@ fn list_dir(args: &Value) -> Value {
 }
 
 fn list_recursive(base: &Path, max_depth: usize, current_depth: usize, output: &mut Vec<String>) {
-    if current_depth > max_depth { return; }
+    if current_depth > max_depth {
+        return;
+    }
     let entries = match fs::read_dir(base) {
         Ok(e) => e,
         Err(_) => return,
@@ -252,7 +274,10 @@ fn tail_file(args: &Value) -> Value {
         None => return json!({"error": "Missing 'path' parameter"}),
     };
     let max_lines = args.get("lines").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
-    let since_bytes = args.get("since_bytes").and_then(|v| v.as_u64()).unwrap_or(0);
+    let since_bytes = args
+        .get("since_bytes")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
 
     let mut file = match fs::File::open(path) {
         Ok(f) => f,
@@ -275,7 +300,11 @@ fn tail_file(args: &Value) -> Value {
             return json!({"error": format!("Read failed: {}", e)});
         }
         let lines: Vec<&str> = new_data.lines().collect();
-        let tail: Vec<&str> = if lines.len() > max_lines { lines[lines.len() - max_lines..].to_vec() } else { lines };
+        let tail: Vec<&str> = if lines.len() > max_lines {
+            lines[lines.len() - max_lines..].to_vec()
+        } else {
+            lines
+        };
         return json!({ "lines": tail, "byte_offset": total_bytes, "total_bytes": total_bytes, "new_content": true });
     }
 
@@ -289,6 +318,10 @@ fn tail_file(args: &Value) -> Value {
         return json!({"error": format!("Read failed: {}", e)});
     }
     let lines: Vec<&str> = buf.lines().collect();
-    let tail: Vec<&str> = if lines.len() > max_lines { lines[lines.len() - max_lines..].to_vec() } else { lines };
+    let tail: Vec<&str> = if lines.len() > max_lines {
+        lines[lines.len() - max_lines..].to_vec()
+    } else {
+        lines
+    };
     json!({ "lines": tail, "byte_offset": total_bytes, "total_bytes": total_bytes, "new_content": true })
 }

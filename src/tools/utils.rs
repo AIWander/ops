@@ -106,10 +106,22 @@ fn clipboard_write(args: &Value) -> Value {
 }
 
 fn notify(args: &Value) -> Value {
-    let title = args.get("title").and_then(|v| v.as_str()).unwrap_or("").trim();
-    let body = args.get("body").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let title = args
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    let body = args
+        .get("body")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
     let icon = args.get("icon").and_then(|v| v.as_str()).unwrap_or("info");
-    let duration_ms = args.get("duration_ms").and_then(|v| v.as_u64()).unwrap_or(5000).max(1);
+    let duration_ms = args
+        .get("duration_ms")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(5000)
+        .max(1);
 
     if title.is_empty() || body.is_empty() {
         return json!({"error": "Both title and body are required"});
@@ -196,7 +208,10 @@ fn kill_process(args: &Value) -> Value {
             if out.status.success() {
                 json!(format!("killed: {}", pid))
             } else {
-                json!(format!("[ERROR] {}", String::from_utf8_lossy(&out.stderr).trim()))
+                json!(format!(
+                    "[ERROR] {}",
+                    String::from_utf8_lossy(&out.stderr).trim()
+                ))
             }
         }
         Err(e) => json!(format!("[ERROR] {}", e)),
@@ -228,12 +243,18 @@ fn list_process(args: &Value) -> Value {
 }
 
 fn port_check(args: &Value) -> Value {
-    let host = args.get("host").and_then(|v| v.as_str()).unwrap_or("127.0.0.1");
+    let host = args
+        .get("host")
+        .and_then(|v| v.as_str())
+        .unwrap_or("127.0.0.1");
     let port = match args.get("port").and_then(|v| v.as_u64()) {
         Some(p) => p as u16,
         None => return json!({"error": "port required"}),
     };
-    let timeout_ms = args.get("timeout_ms").and_then(|v| v.as_u64()).unwrap_or(2000);
+    let timeout_ms = args
+        .get("timeout_ms")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(2000);
 
     let addr = format!("{}:{}", host, port);
     let socket_addr: std::net::SocketAddr = match addr.parse() {
@@ -245,7 +266,11 @@ fn port_check(args: &Value) -> Value {
     let timeout = std::time::Duration::from_millis(timeout_ms);
 
     match std::net::TcpStream::connect_timeout(&socket_addr, timeout) {
-        Ok(_) => json!({"open": true, "host": host, "port": port, "connect_time_ms": start.elapsed().as_millis()}),
-        Err(e) => json!({"open": false, "host": host, "port": port, "error": e.to_string(), "elapsed_ms": start.elapsed().as_millis()}),
+        Ok(_) => {
+            json!({"open": true, "host": host, "port": port, "connect_time_ms": start.elapsed().as_millis()})
+        }
+        Err(e) => {
+            json!({"open": false, "host": host, "port": port, "error": e.to_string(), "elapsed_ms": start.elapsed().as_millis()})
+        }
     }
 }

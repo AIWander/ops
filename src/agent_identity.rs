@@ -63,8 +63,7 @@ struct IdentitySeed {
     session_id_source: Option<String>,
 }
 
-static CURRENT_IDENTITY: Lazy<Mutex<WriterIdentity>> =
-    Lazy::new(|| Mutex::new(default_identity()));
+static CURRENT_IDENTITY: Lazy<Mutex<WriterIdentity>> = Lazy::new(|| Mutex::new(default_identity()));
 static LAST_INITIALIZE: Lazy<Mutex<Value>> = Lazy::new(|| Mutex::new(Value::Null));
 
 fn now_rfc3339() -> String {
@@ -106,13 +105,7 @@ fn normalize_actor(input: &str) -> String {
 
     lower
         .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() {
-                ch
-            } else {
-                '_'
-            }
-        })
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
         .collect::<String>()
         .trim_matches('_')
         .to_string()
@@ -292,13 +285,21 @@ fn extract_state_identity(state: &Value) -> IdentitySeed {
         }
     }
 
-    apply_writer_value(&mut seed, state.pointer("/session/last_writer"), "state.session.last_writer");
+    apply_writer_value(
+        &mut seed,
+        state.pointer("/session/last_writer"),
+        "state.session.last_writer",
+    );
     apply_writer_value(
         &mut seed,
         state.pointer("/operation/last_writer"),
         "state.operation.last_writer",
     );
-    apply_writer_value(&mut seed, state.pointer("/_meta/last_writer"), "state._meta.last_writer");
+    apply_writer_value(
+        &mut seed,
+        state.pointer("/_meta/last_writer"),
+        "state._meta.last_writer",
+    );
     seed
 }
 
@@ -306,7 +307,12 @@ fn apply_state_fallback(seed: &mut IdentitySeed) {
     if let Some(state) = load_state_json() {
         let state_seed = extract_state_identity(&state);
         if let Some(actor) = state_seed.actor {
-            seed.set_actor_if_missing(Some(actor), state_seed.actor_source.unwrap_or_else(|| "state".to_string()));
+            seed.set_actor_if_missing(
+                Some(actor),
+                state_seed
+                    .actor_source
+                    .unwrap_or_else(|| "state".to_string()),
+            );
         }
         IdentitySeed::set_if_missing(
             &mut seed.client_name,

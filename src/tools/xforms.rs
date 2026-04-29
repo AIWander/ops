@@ -168,12 +168,17 @@ fn extract_lines(args: &Value) -> Value {
     };
 
     let reader = BufReader::new(file);
-    let lines: Vec<String> = reader.lines()
+    let lines: Vec<String> = reader
+        .lines()
         .enumerate()
         .filter_map(|(i, line)| {
             let line_num = i + 1;
             let in_range = line_num >= start && (end < 0 || line_num <= end as usize);
-            if in_range { line.ok() } else { None }
+            if in_range {
+                line.ok()
+            } else {
+                None
+            }
         })
         .collect();
 
@@ -215,8 +220,14 @@ fn diff_files(args: &Value) -> Value {
                 diff_lines.push(format!("{}:+ {}", i + 1, lb));
                 changes += 1;
             }
-            (Some(la), None) => { diff_lines.push(format!("{}:- {}", i + 1, la)); changes += 1; }
-            (None, Some(lb)) => { diff_lines.push(format!("{}:+ {}", i + 1, lb)); changes += 1; }
+            (Some(la), None) => {
+                diff_lines.push(format!("{}:- {}", i + 1, la));
+                changes += 1;
+            }
+            (None, Some(lb)) => {
+                diff_lines.push(format!("{}:+ {}", i + 1, lb));
+                changes += 1;
+            }
             _ => {}
         }
     }
@@ -288,10 +299,14 @@ fn hash_file(args: &Value) -> Value {
     let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
     let result = std::process::Command::new("powershell.exe")
-        .args(["-NoProfile", "-Command", &format!(
-            "(Get-FileHash -Path '{}' -Algorithm {}).Hash",
-            path, algo_upper
-        )])
+        .args([
+            "-NoProfile",
+            "-Command",
+            &format!(
+                "(Get-FileHash -Path '{}' -Algorithm {}).Hash",
+                path, algo_upper
+            ),
+        ])
         .output();
 
     match result {
@@ -321,7 +336,13 @@ fn file_stats(args: &Value) -> Value {
         let mut total_size: u64 = 0;
         let mut file_count: u64 = 0;
         let mut dir_count: u64 = 0;
-        walk_dir(Path::new(path), recursive, &mut total_size, &mut file_count, &mut dir_count);
+        walk_dir(
+            Path::new(path),
+            recursive,
+            &mut total_size,
+            &mut file_count,
+            &mut dir_count,
+        );
         json!({
             "type": "directory", "path": path,
             "files": file_count, "directories": dir_count,
@@ -335,8 +356,15 @@ fn walk_dir(p: &Path, recursive: bool, total: &mut u64, files: &mut u64, dirs: &
     if let Ok(entries) = std::fs::read_dir(p) {
         for entry in entries.flatten() {
             if let Ok(m) = entry.metadata() {
-                if m.is_file() { *total += m.len(); *files += 1; }
-                else if m.is_dir() { *dirs += 1; if recursive { walk_dir(&entry.path(), recursive, total, files, dirs); } }
+                if m.is_file() {
+                    *total += m.len();
+                    *files += 1;
+                } else if m.is_dir() {
+                    *dirs += 1;
+                    if recursive {
+                        walk_dir(&entry.path(), recursive, total, files, dirs);
+                    }
+                }
             }
         }
     }
@@ -346,8 +374,13 @@ fn format_size(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
     const GB: u64 = MB * 1024;
-    if bytes >= GB { format!("{:.2} GB", bytes as f64 / GB as f64) }
-    else if bytes >= MB { format!("{:.2} MB", bytes as f64 / MB as f64) }
-    else if bytes >= KB { format!("{:.2} KB", bytes as f64 / KB as f64) }
-    else { format!("{} B", bytes) }
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
 }

@@ -51,9 +51,13 @@ fn load_reminders() -> ReminderStore {
         std::fs::read_to_string(&path)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or(ReminderStore { reminders: Vec::new() })
+            .unwrap_or(ReminderStore {
+                reminders: Vec::new(),
+            })
     } else {
-        ReminderStore { reminders: Vec::new() }
+        ReminderStore {
+            reminders: Vec::new(),
+        }
     }
 }
 
@@ -77,7 +81,11 @@ fn parse_due(input: &str) -> Result<DateTime<Utc>> {
 
     // Relative: "in X hours/minutes/days"
     if s.starts_with("in ") {
-        let parts: Vec<&str> = s.strip_prefix("in ").unwrap_or("").split_whitespace().collect();
+        let parts: Vec<&str> = s
+            .strip_prefix("in ")
+            .unwrap_or("")
+            .split_whitespace()
+            .collect();
         if parts.len() >= 2 {
             if let Ok(n) = parts[0].parse::<i64>() {
                 let unit = parts[1];
@@ -103,8 +111,13 @@ fn parse_due(input: &str) -> Result<DateTime<Utc>> {
 
     // "next monday/tuesday/etc"
     let weekdays = [
-        ("monday", Weekday::Mon), ("tuesday", Weekday::Tue), ("wednesday", Weekday::Wed),
-        ("thursday", Weekday::Thu), ("friday", Weekday::Fri), ("saturday", Weekday::Sat), ("sunday", Weekday::Sun),
+        ("monday", Weekday::Mon),
+        ("tuesday", Weekday::Tue),
+        ("wednesday", Weekday::Wed),
+        ("thursday", Weekday::Thu),
+        ("friday", Weekday::Fri),
+        ("saturday", Weekday::Sat),
+        ("sunday", Weekday::Sun),
     ];
     for (name, wd) in &weekdays {
         if s.contains(name) {
@@ -112,7 +125,8 @@ fn parse_due(input: &str) -> Result<DateTime<Utc>> {
             while target.weekday() != *wd {
                 target += Duration::days(1);
             }
-            let time = extract_time_from_str(&s).unwrap_or(NaiveTime::from_hms_opt(9, 0, 0).unwrap());
+            let time =
+                extract_time_from_str(&s).unwrap_or(NaiveTime::from_hms_opt(9, 0, 0).unwrap());
             let dt = target.date_naive().and_time(time);
             return Ok(dt.and_local_timezone(Local).unwrap().with_timezone(&Utc));
         }
@@ -127,10 +141,17 @@ fn extract_time_from_str(s: &str) -> Option<NaiveTime> {
     let re = regex::Regex::new(r"(\d{1,2}):?(\d{2})?\s*(am|pm)?").ok()?;
     if let Some(caps) = re.captures(s) {
         let mut hour: u32 = caps.get(1)?.as_str().parse().ok()?;
-        let min: u32 = caps.get(2).map(|m| m.as_str().parse().unwrap_or(0)).unwrap_or(0);
+        let min: u32 = caps
+            .get(2)
+            .map(|m| m.as_str().parse().unwrap_or(0))
+            .unwrap_or(0);
         if let Some(ampm) = caps.get(3) {
-            if ampm.as_str() == "pm" && hour < 12 { hour += 12; }
-            if ampm.as_str() == "am" && hour == 12 { hour = 0; }
+            if ampm.as_str() == "pm" && hour < 12 {
+                hour += 12;
+            }
+            if ampm.as_str() == "am" && hour == 12 {
+                hour = 0;
+            }
         }
         return NaiveTime::from_hms_opt(hour, min, 0);
     }
@@ -139,8 +160,14 @@ fn extract_time_from_str(s: &str) -> Option<NaiveTime> {
 
 pub async fn add_reminder(args: Value) -> Result<Value> {
     let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("");
-    let due_str = args.get("due").and_then(|v| v.as_str()).unwrap_or("in 1 hour");
-    let recurring = args.get("recurring").and_then(|v| v.as_str()).map(String::from);
+    let due_str = args
+        .get("due")
+        .and_then(|v| v.as_str())
+        .unwrap_or("in 1 hour");
+    let recurring = args
+        .get("recurring")
+        .and_then(|v| v.as_str())
+        .map(String::from);
 
     let due = parse_due(due_str)?;
     let reminder = Reminder {
@@ -167,22 +194,29 @@ pub async fn add_reminder(args: Value) -> Result<Value> {
 }
 
 pub async fn list_reminders(args: Value) -> Result<Value> {
-    let filter = args.get("filter").and_then(|v| v.as_str()).unwrap_or("pending");
+    let filter = args
+        .get("filter")
+        .and_then(|v| v.as_str())
+        .unwrap_or("pending");
     let store = load_reminders();
     let now = Utc::now();
 
-    let filtered: Vec<&Reminder> = store.reminders.iter().filter(|r| {
-        match filter {
+    let filtered: Vec<&Reminder> = store
+        .reminders
+        .iter()
+        .filter(|r| match filter {
             "pending" => r.status == "pending",
             "completed" => r.status == "completed",
             "overdue" => {
-                r.status == "pending" &&
-                DateTime::parse_from_rfc3339(&r.due).map(|d| d < now).unwrap_or(false)
+                r.status == "pending"
+                    && DateTime::parse_from_rfc3339(&r.due)
+                        .map(|d| d < now)
+                        .unwrap_or(false)
             }
             "all" => true,
             _ => r.status == "pending",
-        }
-    }).collect();
+        })
+        .collect();
 
     let json_reminders: Vec<Value> = filtered.iter().map(|r| json!({
         "id": r.id, "text": r.text, "due": r.due, "status": r.status, "recurring": r.recurring
@@ -206,8 +240,8 @@ pub async fn complete_reminder(args: Value) -> Result<Value> {
 
             // Handle recurring
             if let Some(ref schedule) = r.recurring {
-                let current_due = DateTime::parse_from_rfc3339(&r.due)
-                    .unwrap_or_else(|_| Utc::now().into());
+                let current_due =
+                    DateTime::parse_from_rfc3339(&r.due).unwrap_or_else(|_| Utc::now().into());
                 let next = match schedule.as_str() {
                     "daily" => current_due + Duration::days(1),
                     "weekly" => current_due + Duration::weeks(1),
@@ -249,9 +283,15 @@ pub async fn check_due(_args: Value) -> Result<Value> {
     let store = load_reminders();
     let now = Utc::now();
 
-    let due: Vec<Value> = store.reminders.iter()
+    let due: Vec<Value> = store
+        .reminders
+        .iter()
         .filter(|r| r.status == "pending")
-        .filter(|r| DateTime::parse_from_rfc3339(&r.due).map(|d| d <= now).unwrap_or(false))
+        .filter(|r| {
+            DateTime::parse_from_rfc3339(&r.due)
+                .map(|d| d <= now)
+                .unwrap_or(false)
+        })
         .map(|r| json!({ "id": r.id, "text": r.text, "due": r.due }))
         .collect();
 
@@ -260,28 +300,42 @@ pub async fn check_due(_args: Value) -> Result<Value> {
 
 pub async fn add_recurring(args: Value) -> Result<Value> {
     let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("");
-    let schedule = args.get("schedule").and_then(|v| v.as_str()).unwrap_or("daily");
-    let time = args.get("time").and_then(|v| v.as_str()).unwrap_or("9:00 AM");
+    let schedule = args
+        .get("schedule")
+        .and_then(|v| v.as_str())
+        .unwrap_or("daily");
+    let time = args
+        .get("time")
+        .and_then(|v| v.as_str())
+        .unwrap_or("9:00 AM");
 
     add_reminder(json!({
         "text": text,
         "due": format!("tomorrow at {}", time),
         "recurring": schedule
-    })).await
+    }))
+    .await
 }
 
 pub async fn add_scheduled(args: Value) -> Result<Value> {
-    let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("Ops_Reminder");
+    let name = args
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Ops_Reminder");
     let time = args.get("time").and_then(|v| v.as_str()).unwrap_or("09:00");
     let message = args.get("message").and_then(|v| v.as_str()).unwrap_or("");
 
     let task_name = format!("Ops_{}", name.replace(' ', "_"));
     let cmd = format!(
         "schtasks /Create /TN \"{}\" /TR \"msg * /TIME:10 {}\" /SC ONCE /ST {} /F",
-        task_name, message.replace('"', "'"), time
+        task_name,
+        message.replace('"', "'"),
+        time
     );
 
-    let output = std::process::Command::new("cmd").args(["/C", &cmd]).output()?;
+    let output = std::process::Command::new("cmd")
+        .args(["/C", &cmd])
+        .output()?;
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     Ok(json!({ "task_name": task_name, "time": time, "output": stdout.trim() }))
@@ -298,8 +352,12 @@ pub async fn list_scheduled(_args: Value) -> Result<Value> {
 pub async fn delete_scheduled(args: Value) -> Result<Value> {
     let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
     let cmd = format!("schtasks /Delete /TN \"{}\" /F", name);
-    let output = std::process::Command::new("cmd").args(["/C", &cmd]).output()?;
-    Ok(json!({ "status": "deleted", "name": name, "output": String::from_utf8_lossy(&output.stdout).trim() }))
+    let output = std::process::Command::new("cmd")
+        .args(["/C", &cmd])
+        .output()?;
+    Ok(
+        json!({ "status": "deleted", "name": name, "output": String::from_utf8_lossy(&output.stdout).trim() }),
+    )
 }
 
 pub async fn time_check(_args: Value) -> Result<Value> {
@@ -337,8 +395,14 @@ fn save_dead_drop(msgs: &[DeadDropMessage]) -> Result<()> {
 
 pub async fn dead_drop_leave(args: Value) -> Result<Value> {
     let message = args.get("message").and_then(|v| v.as_str()).unwrap_or("");
-    let from = args.get("from").and_then(|v| v.as_str()).unwrap_or("autonomous");
-    let priority = args.get("priority").and_then(|v| v.as_str()).unwrap_or("normal");
+    let from = args
+        .get("from")
+        .and_then(|v| v.as_str())
+        .unwrap_or("autonomous");
+    let priority = args
+        .get("priority")
+        .and_then(|v| v.as_str())
+        .unwrap_or("normal");
 
     let msg = DeadDropMessage {
         id: Uuid::new_v4().to_string()[..8].to_string(),
@@ -372,10 +436,16 @@ pub async fn dead_drop_clear(args: Value) -> Result<Value> {
 
     match specific_id {
         Some(id) => {
-            for m in &mut msgs { if m.id == id { m.read = true; } }
+            for m in &mut msgs {
+                if m.id == id {
+                    m.read = true;
+                }
+            }
         }
         None => {
-            for m in &mut msgs { m.read = true; }
+            for m in &mut msgs {
+                m.read = true;
+            }
         }
     }
 

@@ -1,15 +1,15 @@
-mod config;
 mod agent_identity;
-mod tools;
+mod config;
 pub mod security;
+mod tools;
 
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
-use chrono::Local;
 
 // ============================================================================
 // MCP Protocol Types
@@ -158,7 +158,8 @@ fn get_tools_list() -> Value {
             "inputSchema": {"type": "object", "properties": {}}
         }
     ]);
-    let ops_native: Vec<serde_json::Value> = ops_native_json.as_array().cloned().unwrap_or_default();
+    let ops_native: Vec<serde_json::Value> =
+        ops_native_json.as_array().cloned().unwrap_or_default();
     all_tools.extend(ops_native);
     serde_json::json!({ "tools": all_tools })
 }
@@ -172,13 +173,18 @@ fn handle_mcp_rebuild(_server: &Server, params: Value) -> Result<Value, String> 
     use std::thread;
     use std::time::Duration;
 
-    let target = params.get("target")
+    let target = params
+        .get("target")
         .and_then(|v| v.as_str())
         .ok_or("Missing 'target' parameter")?;
 
     let rust_mcp_dir = match std::env::var("OPS_DEV_DIR").map(PathBuf::from) {
         Ok(p) => p,
-        Err(_) => return Err("OPS_DEV_DIR not set; this tool requires an explicit dev directory".to_string()),
+        Err(_) => {
+            return Err(
+                "OPS_DEV_DIR not set; this tool requires an explicit dev directory".to_string(),
+            )
+        }
     };
 
     let target_dir = rust_mcp_dir.join(target);
@@ -213,7 +219,12 @@ fn handle_mcp_rebuild(_server: &Server, params: Value) -> Result<Value, String> 
     thread::sleep(Duration::from_secs(3));
 
     let cargo_path = std::env::var("USERPROFILE")
-        .map(|p| PathBuf::from(p).join(".cargo").join("bin").join("cargo.exe"))
+        .map(|p| {
+            PathBuf::from(p)
+                .join(".cargo")
+                .join("bin")
+                .join("cargo.exe")
+        })
         .unwrap_or_else(|_| PathBuf::from("cargo"));
 
     let build_output = Command::new(&cargo_path)
@@ -292,15 +303,17 @@ fn load_fallback_map() -> Result<Value, String> {
     } else {
         DEFAULT_FALLBACK_MAP.to_string()
     };
-    serde_json::from_str(&content)
-        .map_err(|e| format!("Invalid JSON in fallback map: {}", e))
+    serde_json::from_str(&content).map_err(|e| format!("Invalid JSON in fallback map: {}", e))
 }
 
 fn handle_server_health(_server: &Server, params: Value) -> Result<Value, String> {
     let map = load_fallback_map()?;
-    let filter: Option<Vec<String>> = params.get("servers")
+    let filter: Option<Vec<String>> = params
+        .get("servers")
         .and_then(|s| serde_json::from_value(s.clone()).ok());
-    let servers = map.get("servers").and_then(|s| s.as_object())
+    let servers = map
+        .get("servers")
+        .and_then(|s| s.as_object())
         .ok_or("No servers in fallback map")?;
 
     let mut results = serde_json::Map::new();
@@ -309,16 +322,34 @@ fn handle_server_health(_server: &Server, params: Value) -> Result<Value, String
 
     for (name, config) in servers {
         if let Some(ref f) = filter {
-            if !f.iter().any(|s| s == name) { continue; }
+            if !f.iter().any(|s| s == name) {
+                continue;
+            }
         }
-        let process = config.get("process").and_then(|p| p.as_str()).unwrap_or("unknown");
+        let process = config
+            .get("process")
+            .and_then(|p| p.as_str())
+            .unwrap_or("unknown");
         let alive = is_process_running(process);
-        if alive { alive_count += 1; } else { dead_count += 1; }
-        let mirror = config.get("mirror").and_then(|m| m.as_str()).unwrap_or("none");
-        let critical = config.get("critical").and_then(|c| c.as_bool()).unwrap_or(false);
-        results.insert(name.clone(), json!({
-            "alive": alive, "process": process, "mirror": mirror, "critical": critical
-        }));
+        if alive {
+            alive_count += 1;
+        } else {
+            dead_count += 1;
+        }
+        let mirror = config
+            .get("mirror")
+            .and_then(|m| m.as_str())
+            .unwrap_or("none");
+        let critical = config
+            .get("critical")
+            .and_then(|c| c.as_bool())
+            .unwrap_or(false);
+        results.insert(
+            name.clone(),
+            json!({
+                "alive": alive, "process": process, "mirror": mirror, "critical": critical
+            }),
+        );
     }
     Ok(json!({
         "servers": results,
@@ -327,20 +358,34 @@ fn handle_server_health(_server: &Server, params: Value) -> Result<Value, String
 }
 
 fn handle_tool_fallback(_server: &Server, params: Value) -> Result<Value, String> {
-    let tool = params.get("tool").and_then(|t| t.as_str())
+    let tool = params
+        .get("tool")
+        .and_then(|t| t.as_str())
         .ok_or("tool parameter required")?;
     let map = load_fallback_map()?;
 
-    if let Some(equiv) = map.get("equivalents").and_then(|e| e.get(tool)).and_then(|v| v.as_str()) {
-        return Ok(json!({ "tool": tool, "fallback": equiv, "type": "equivalent", "note": "Direct mirror tool available" }));
+    if let Some(equiv) = map
+        .get("equivalents")
+        .and_then(|e| e.get(tool))
+        .and_then(|v| v.as_str())
+    {
+        return Ok(
+            json!({ "tool": tool, "fallback": equiv, "type": "equivalent", "note": "Direct mirror tool available" }),
+        );
     }
-    if let Some(chain) = map.get("fallback_chains").and_then(|c| c.get(tool)).and_then(|v| v.as_array()) {
+    if let Some(chain) = map
+        .get("fallback_chains")
+        .and_then(|c| c.get(tool))
+        .and_then(|v| v.as_array())
+    {
         let fallbacks: Vec<&str> = chain.iter().filter_map(|v| v.as_str()).collect();
         return Ok(json!({ "tool": tool, "fallbacks": fallbacks, "type": "chain" }));
     }
     if let Some(equivs) = map.get("equivalents").and_then(|e| e.as_object()) {
         for (key, val) in equivs {
-            if key.starts_with('_') { continue; }
+            if key.starts_with('_') {
+                continue;
+            }
             if val.as_str() == Some(tool) {
                 return Ok(json!({ "tool": tool, "fallback": key, "type": "reverse_equivalent" }));
             }
@@ -350,30 +395,56 @@ fn handle_tool_fallback(_server: &Server, params: Value) -> Result<Value, String
 }
 
 fn handle_preflight_deploy(_server: &Server, params: Value) -> Result<Value, String> {
-    let target = params.get("target").and_then(|t| t.as_str())
+    let target = params
+        .get("target")
+        .and_then(|t| t.as_str())
         .ok_or("target parameter required")?;
     let map = load_fallback_map()?;
 
     let deploy_seq = map.get("deploy_sequence").and_then(|d| d.get(target));
-    let pre_kill_steps = deploy_seq.and_then(|d| d.get("pre_kill")).and_then(|p| p.as_array())
-        .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>()).unwrap_or_default();
-    let post_restart_steps = deploy_seq.and_then(|d| d.get("post_restart")).and_then(|p| p.as_array())
-        .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>()).unwrap_or_default();
+    let pre_kill_steps = deploy_seq
+        .and_then(|d| d.get("pre_kill"))
+        .and_then(|p| p.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
+        .unwrap_or_default();
+    let post_restart_steps = deploy_seq
+        .and_then(|d| d.get("post_restart"))
+        .and_then(|p| p.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
+        .unwrap_or_default();
 
     let server_config = map.get("servers").and_then(|s| s.get(target));
-    let mirror_name = server_config.and_then(|s| s.get("mirror")).and_then(|m| m.as_str());
+    let mirror_name = server_config
+        .and_then(|s| s.get("mirror"))
+        .and_then(|m| m.as_str());
     let mirror_alive = if let Some(mirror) = mirror_name {
-        let mirror_process = map.get("servers").and_then(|s| s.get(mirror))
-            .and_then(|s| s.get("process")).and_then(|p| p.as_str()).unwrap_or("unknown");
+        let mirror_process = map
+            .get("servers")
+            .and_then(|s| s.get(mirror))
+            .and_then(|s| s.get("process"))
+            .and_then(|p| p.as_str())
+            .unwrap_or("unknown");
         is_process_running(mirror_process)
-    } else { false };
-    let critical = server_config.and_then(|s| s.get("critical")).and_then(|c| c.as_bool()).unwrap_or(false);
-    let safe = if critical && mirror_name.is_some() { mirror_alive } else { true };
+    } else {
+        false
+    };
+    let critical = server_config
+        .and_then(|s| s.get("critical"))
+        .and_then(|c| c.as_bool())
+        .unwrap_or(false);
+    let safe = if critical && mirror_name.is_some() {
+        mirror_alive
+    } else {
+        true
+    };
 
     let mut warnings = Vec::new();
     if critical && !mirror_alive && mirror_name.is_some() {
-        warnings.push(format!("BLOCK: Mirror '{}' is DOWN. Cannot safely kill critical server '{}'.",
-            mirror_name.unwrap_or("unknown"), target));
+        warnings.push(format!(
+            "BLOCK: Mirror '{}' is DOWN. Cannot safely kill critical server '{}'.",
+            mirror_name.unwrap_or("unknown"),
+            target
+        ));
     }
 
     Ok(json!({
@@ -385,13 +456,19 @@ fn handle_preflight_deploy(_server: &Server, params: Value) -> Result<Value, Str
 }
 
 fn handle_smoke_test(_server: &Server, params: Value) -> Result<Value, String> {
-    let exe_dir = params.get("exe_dir")
+    let exe_dir = params
+        .get("exe_dir")
         .and_then(|v| v.as_str())
         .ok_or("Missing 'exe_dir' parameter")?;
 
-    let expected: Vec<String> = params.get("expected")
+    let expected: Vec<String> = params
+        .get("expected")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
 
     let dir = PathBuf::from(exe_dir);
@@ -411,7 +488,9 @@ fn handle_smoke_test(_server: &Server, params: Value) -> Result<Value, String> {
                     found += 1;
                 }
             }
-            Err(_) => { missing.push(exe.clone()); }
+            Err(_) => {
+                missing.push(exe.clone());
+            }
         }
     }
 
@@ -426,17 +505,29 @@ fn handle_smoke_test(_server: &Server, params: Value) -> Result<Value, String> {
 }
 
 fn handle_powershell(_server: &Server, params: Value) -> Result<Value, String> {
+    use crate::security::blocklist::{check, classify, log_audit, Guard};
     use std::sync::mpsc;
     use std::thread;
     use std::time::Duration;
-    use crate::security::blocklist::{check, log_audit, Guard, classify};
 
-    let allow_destructive = params.get("allow_destructive").and_then(|v| v.as_bool()).unwrap_or(false);
-    let confirm = params.get("confirm").and_then(|v| v.as_bool()).unwrap_or(false);
+    let allow_destructive = params
+        .get("allow_destructive")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let confirm = params
+        .get("confirm")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let cmd = params.get("command").and_then(|v| v.as_str()).unwrap_or("");
 
     match check(cmd, allow_destructive, confirm) {
-        Guard::Refuse { error_kind, tier, reason, matched, guidance } => {
+        Guard::Refuse {
+            error_kind,
+            tier,
+            reason,
+            matched,
+            guidance,
+        } => {
             let m = classify(cmd);
             log_audit("powershell", &m, "blocked", cmd);
             return Ok(json!({
@@ -460,12 +551,14 @@ fn handle_powershell(_server: &Server, params: Value) -> Result<Value, String> {
         }
     }
 
-    let command = params.get("command")
+    let command = params
+        .get("command")
         .and_then(|v| v.as_str())
         .ok_or("Missing 'command' parameter")?
         .to_string();
 
-    let timeout = params.get("timeout_secs")
+    let timeout = params
+        .get("timeout_secs")
         .and_then(|v| v.as_u64())
         .unwrap_or(30);
 
@@ -477,7 +570,8 @@ fn handle_powershell(_server: &Server, params: Value) -> Result<Value, String> {
         let _ = tx.send(result);
     });
 
-    let output = rx.recv_timeout(Duration::from_secs(timeout))
+    let output = rx
+        .recv_timeout(Duration::from_secs(timeout))
         .map_err(|_| format!("PowerShell command timed out after {} seconds", timeout))?
         .map_err(|e| format!("Failed to execute powershell: {}", e))?;
 
@@ -501,13 +595,26 @@ fn handle_archive_create(_server: &Server, params: Value) -> Result<Value, Strin
     let format = params["format"].as_str().unwrap_or("zip");
     let path_list: Vec<&str> = paths.iter().filter_map(|p| p.as_str()).collect();
     let ps_cmd = match format {
-        "zip" => format!("Compress-Archive -Path '{}' -DestinationPath '{}' -Force; Write-Output 'Created: {}'",
-            path_list.join("','"), output, output),
-        _ => format!("tar -cf '{}' {}; Write-Output 'Created: {}'", output, path_list.join(" "), output),
+        "zip" => format!(
+            "Compress-Archive -Path '{}' -DestinationPath '{}' -Force; Write-Output 'Created: {}'",
+            path_list.join("','"),
+            output,
+            output
+        ),
+        _ => format!(
+            "tar -cf '{}' {}; Write-Output 'Created: {}'",
+            output,
+            path_list.join(" "),
+            output
+        ),
     };
-    let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", &ps_cmd])
-        .output().map_err(|e| e.to_string())?;
-    Ok(json!({"success": out.status.success(), "stdout": String::from_utf8_lossy(&out.stdout).trim().to_string(), "stderr": String::from_utf8_lossy(&out.stderr).trim().to_string()}))
+    let out = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps_cmd])
+        .output()
+        .map_err(|e| e.to_string())?;
+    Ok(
+        json!({"success": out.status.success(), "stdout": String::from_utf8_lossy(&out.stdout).trim().to_string(), "stderr": String::from_utf8_lossy(&out.stderr).trim().to_string()}),
+    )
 }
 
 fn handle_archive_extract(_server: &Server, params: Value) -> Result<Value, String> {
@@ -518,21 +625,34 @@ fn handle_archive_extract(_server: &Server, params: Value) -> Result<Value, Stri
         format!("Expand-Archive -Path '{}' -DestinationPath '{}' -Force; Write-Output 'Extracted to: {}'",
             archive, dest, dest)
     } else {
-        format!("tar -xf '{}' -C '{}' 2>&1; Write-Output 'Extracted to: {}'", archive, dest, dest)
+        format!(
+            "tar -xf '{}' -C '{}' 2>&1; Write-Output 'Extracted to: {}'",
+            archive, dest, dest
+        )
     };
-    let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", &ps_cmd])
-        .output().map_err(|e| e.to_string())?;
-    Ok(json!({"success": out.status.success(), "stdout": String::from_utf8_lossy(&out.stdout).trim().to_string(), "stderr": String::from_utf8_lossy(&out.stderr).trim().to_string()}))
+    let out = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps_cmd])
+        .output()
+        .map_err(|e| e.to_string())?;
+    Ok(
+        json!({"success": out.status.success(), "stdout": String::from_utf8_lossy(&out.stdout).trim().to_string(), "stderr": String::from_utf8_lossy(&out.stderr).trim().to_string()}),
+    )
 }
 
 fn handle_md2docx(_server: &Server, params: Value) -> Result<Value, String> {
     let input = params["input"].as_str().ok_or("input required")?;
     let output = params["output"].as_str().ok_or("output required")?;
-    let ps_cmd = format!("pandoc '{}' -o '{}' 2>&1; if ($?) {{ Write-Output 'Converted: {} -> {}' }}",
-        input, output, input, output);
-    let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", &ps_cmd])
-        .output().map_err(|e| e.to_string())?;
-    Ok(json!({"success": out.status.success(), "stdout": String::from_utf8_lossy(&out.stdout).trim().to_string(), "stderr": String::from_utf8_lossy(&out.stderr).trim().to_string()}))
+    let ps_cmd = format!(
+        "pandoc '{}' -o '{}' 2>&1; if ($?) {{ Write-Output 'Converted: {} -> {}' }}",
+        input, output, input, output
+    );
+    let out = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps_cmd])
+        .output()
+        .map_err(|e| e.to_string())?;
+    Ok(
+        json!({"success": out.status.success(), "stdout": String::from_utf8_lossy(&out.stdout).trim().to_string(), "stderr": String::from_utf8_lossy(&out.stderr).trim().to_string()}),
+    )
 }
 
 fn handle_search_files(_server: &Server, params: Value) -> Result<Value, String> {
@@ -547,8 +667,10 @@ fn handle_search_files(_server: &Server, params: Value) -> Result<Value, String>
             "Get-ChildItem -Path '{}' -Recurse -File -Filter '*{}*' -EA SilentlyContinue | Select-Object -First 50 | ForEach-Object {{ $_.FullName }}",
             path, pattern),
     };
-    let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", &ps_cmd])
-        .output().map_err(|e| e.to_string())?;
+    let out = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps_cmd])
+        .output()
+        .map_err(|e| e.to_string())?;
     let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
     let results: Vec<&str> = stdout.lines().collect();
     Ok(json!({"matches": results, "count": results.len(), "search_type": search_type}))
@@ -624,7 +746,11 @@ fn main() {
                         message: format!("Parse error: {}", e),
                     },
                 };
-                let _ = writeln!(stdout, "{}", serde_json::to_string(&error_response).unwrap());
+                let _ = writeln!(
+                    stdout,
+                    "{}",
+                    serde_json::to_string(&error_response).unwrap()
+                );
                 let _ = stdout.flush();
                 continue;
             }
@@ -636,10 +762,17 @@ fn main() {
                 id: request.id.clone(),
                 error: JsonRpcError {
                     code: -32600,
-                    message: format!("Invalid JSON-RPC version: expected '2.0', got '{}'", request.jsonrpc),
+                    message: format!(
+                        "Invalid JSON-RPC version: expected '2.0', got '{}'",
+                        request.jsonrpc
+                    ),
                 },
             };
-            let _ = writeln!(stdout, "{}", serde_json::to_string(&error_response).unwrap());
+            let _ = writeln!(
+                stdout,
+                "{}",
+                serde_json::to_string(&error_response).unwrap()
+            );
             let _ = stdout.flush();
             continue;
         }
@@ -658,13 +791,11 @@ fn main() {
                 }
             }
             "notifications/initialized" => continue,
-            "tools/list" => {
-                JsonRpcSuccess {
-                    jsonrpc: "2.0".to_string(),
-                    id: request.id,
-                    result: get_tools_list(),
-                }
-            }
+            "tools/list" => JsonRpcSuccess {
+                jsonrpc: "2.0".to_string(),
+                id: request.id,
+                result: get_tools_list(),
+            },
             "tools/call" => {
                 let params = request.params.unwrap_or(json!({}));
                 let tool_name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -689,13 +820,11 @@ fn main() {
                     },
                 }
             }
-            _ => {
-                JsonRpcSuccess {
-                    jsonrpc: "2.0".to_string(),
-                    id: request.id,
-                    result: json!({}),
-                }
-            }
+            _ => JsonRpcSuccess {
+                jsonrpc: "2.0".to_string(),
+                id: request.id,
+                result: json!({}),
+            },
         };
 
         let _ = writeln!(stdout, "{}", serde_json::to_string(&response).unwrap());

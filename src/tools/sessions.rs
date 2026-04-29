@@ -1,13 +1,13 @@
 //! Persistent shell sessions — ported from local crate session.rs
 //! Replaces psession_* tools with the richer session_* API.
 
+use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use once_cell::sync::Lazy;
 use uuid::Uuid;
 
 #[cfg(windows)]
@@ -39,7 +39,9 @@ fn start_output_reader(stdout: std::process::ChildStdout, buffer: Arc<Mutex<Vec<
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
             match line {
-                Ok(l) => { buffer.lock().unwrap().push(l); }
+                Ok(l) => {
+                    buffer.lock().unwrap().push(l);
+                }
                 Err(_) => break,
             }
         }
@@ -58,7 +60,9 @@ impl PersistentSession {
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
 
-        let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn PowerShell: {}", e))?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("Failed to spawn PowerShell: {}", e))?;
         let stdout = child.stdout.take().ok_or("Failed to take stdout")?;
         let output_buffer = Arc::new(Mutex::new(Vec::new()));
         start_output_reader(stdout, output_buffer.clone());
@@ -79,8 +83,14 @@ impl PersistentSession {
         let marker = format!("__EXIT_{}__", &Uuid::new_v4().to_string()[..8]);
         let full_cmd = format!("{}; Write-Host '{}' $LASTEXITCODE\n", command, marker);
 
-        let stdin = self.child.stdin.as_mut().ok_or("No stdin available - session may be dead")?;
-        stdin.write_all(full_cmd.as_bytes()).map_err(|e| format!("Write failed: {}", e))?;
+        let stdin = self
+            .child
+            .stdin
+            .as_mut()
+            .ok_or("No stdin available - session may be dead")?;
+        stdin
+            .write_all(full_cmd.as_bytes())
+            .map_err(|e| format!("Write failed: {}", e))?;
         stdin.flush().map_err(|e| format!("Flush failed: {}", e))?;
 
         let start = std::time::Instant::now();
@@ -91,7 +101,10 @@ impl PersistentSession {
             if start.elapsed() > timeout {
                 return Err(format!("Command timed out after {}s", timeout_secs));
             }
-            { let mut buf = self.output_buffer.lock().unwrap(); collected.append(&mut *buf); }
+            {
+                let mut buf = self.output_buffer.lock().unwrap();
+                collected.append(&mut *buf);
+            }
 
             let full_output = collected.join("\n");
             if full_output.contains(&marker) {
@@ -276,14 +289,26 @@ fn session_create(args: &Value) -> Value {
 }
 
 fn session_run(args: &Value) -> Value {
-    use crate::security::blocklist::{check, log_audit, Guard, classify};
+    use crate::security::blocklist::{check, classify, log_audit, Guard};
 
-    let allow_destructive = args.get("allow_destructive").and_then(|v| v.as_bool()).unwrap_or(false);
-    let confirm = args.get("confirm").and_then(|v| v.as_bool()).unwrap_or(false);
+    let allow_destructive = args
+        .get("allow_destructive")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let confirm = args
+        .get("confirm")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
 
     match check(cmd, allow_destructive, confirm) {
-        Guard::Refuse { error_kind, tier, reason, matched, guidance } => {
+        Guard::Refuse {
+            error_kind,
+            tier,
+            reason,
+            matched,
+            guidance,
+        } => {
             let m = classify(cmd);
             log_audit("session_run", &m, "blocked", cmd);
             return serde_json::json!({
@@ -315,13 +340,17 @@ fn session_run(args: &Value) -> Value {
     let mut sessions = SESSIONS.lock().unwrap();
     if !sessions.contains_key(session_name) && session_name == "default" {
         match PersistentSession::new("default", None) {
-            Ok(s) => { sessions.insert("default".to_string(), s); }
+            Ok(s) => {
+                sessions.insert("default".to_string(), s);
+            }
             Err(e) => return json!({"error": format!("Failed to create default session: {}", e)}),
         }
     }
     let session = match sessions.get_mut(session_name) {
         Some(s) => s,
-        None => return json!({"error": format!("Session '{}' not found. Create with session_create first.", session_name)}),
+        None => {
+            return json!({"error": format!("Session '{}' not found. Create with session_create first.", session_name)})
+        }
     };
     if !session.is_alive() {
         return json!({"error": "Session process has died", "hint": "Destroy and recreate the session"});
@@ -344,8 +373,14 @@ fn session_cd(args: &Value) -> Value {
 
 fn session_setenv(args: &Value) -> Value {
     let session_name = args["session"].as_str().unwrap_or("default");
-    let key = match args["key"].as_str() { Some(k) => k, None => return json!({"error": "key required"}) };
-    let value = match args["value"].as_str() { Some(v) => v, None => return json!({"error": "value required"}) };
+    let key = match args["key"].as_str() {
+        Some(k) => k,
+        None => return json!({"error": "key required"}),
+    };
+    let value = match args["value"].as_str() {
+        Some(v) => v,
+        None => return json!({"error": "value required"}),
+    };
 
     let run_args = json!({"session": session_name, "command": format!("$env:{}='{}'", key, value)});
     let result = session_run(&run_args);
@@ -378,15 +413,18 @@ fn session_getenv(args: &Value) -> Value {
 fn session_list(args: &Value) -> Value {
     let _ = args;
     let mut sessions = SESSIONS.lock().unwrap();
-    let list: Vec<Value> = sessions.iter_mut().map(|(_, s)| {
-        json!({
-            "name": s.name, "cwd": s.cwd,
-            "env_count": s.env.len(),
-            "history_count": s.history.len(),
-            "created_at": s.created_at,
-            "alive": s.is_alive()
+    let list: Vec<Value> = sessions
+        .iter_mut()
+        .map(|(_, s)| {
+            json!({
+                "name": s.name, "cwd": s.cwd,
+                "env_count": s.env.len(),
+                "history_count": s.history.len(),
+                "created_at": s.created_at,
+                "alive": s.is_alive()
+            })
         })
-    }).collect();
+        .collect();
     json!({"sessions": list, "count": list.len()})
 }
 

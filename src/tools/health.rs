@@ -24,7 +24,9 @@ pub async fn health_report(_args: Value) -> Result<Value> {
 pub async fn status(args: Value) -> Result<Value> {
     let topic = args.get("topic").and_then(|v| v.as_str());
     match topic {
-        Some(t) => Ok(json!({ "topic": t, "status": "ok", "note": "Status files not available in ops" })),
+        Some(t) => {
+            Ok(json!({ "topic": t, "status": "ok", "note": "Status files not available in ops" }))
+        }
         None => health_check(json!({})).await,
     }
 }
@@ -60,8 +62,9 @@ pub async fn checkpoint_clear(_args: Value) -> Result<Value> {
 
 pub async fn git_rollback(args: Value) -> Result<Value> {
     let commit = args.get("commit").and_then(|v| v.as_str()).unwrap_or("");
-    let repo_dir = std::env::var("OPS_DEV_DIR")
-        .map_err(|_| anyhow::anyhow!("OPS_DEV_DIR not set; this tool requires an explicit dev directory"))?;
+    let repo_dir = std::env::var("OPS_DEV_DIR").map_err(|_| {
+        anyhow::anyhow!("OPS_DEV_DIR not set; this tool requires an explicit dev directory")
+    })?;
     let output = std::process::Command::new("git")
         .args(["reset", "--hard", commit])
         .current_dir(&repo_dir)
