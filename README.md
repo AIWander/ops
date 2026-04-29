@@ -4,13 +4,13 @@
 
 **Windows operations MCP server: file I/O, persistent sessions, build/deploy, breadcrumb tracking, reminders, and dead-drop coordination. The `powershell` and `session_run` tools enforce a 4-tier safety blocklist for destructive commands.**
 
-Version 0.2.0 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
+Version 0.2.1 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
 
 **Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** - a multi-agent AI orchestration platform. Related repos: [local](https://github.com/AIWander/local) · [manager](https://github.com/AIWander/manager) · [hands](https://github.com/AIWander/hands) · [workflow](https://github.com/AIWander/workflow) · [cpc-paths](https://github.com/AIWander/cpc-paths) · [cpc-breadcrumbs](https://github.com/AIWander/cpc-breadcrumbs)
 
 ---
 
-## What's New in v0.2.0: First Public Release
+## What's New in v0.2.1
 
 v0.2.0 is the first public release of `ops`, the Windows operations MCP server for Claude Desktop.
 Originated as an internal consolidation of the `research-mcp` crate from the CPC stack.
