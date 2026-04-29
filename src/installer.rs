@@ -226,7 +226,7 @@ fn unregister() -> Result<()> {
     };
 
     if let Some(Value::Object(servers)) = root_obj.get_mut("mcpServers") {
-        servers.shift_remove("ops");
+        servers.remove("ops");
     }
 
     write_pretty(&config_path, &root)?;
