@@ -4,9 +4,9 @@
 
 **Windows operations MCP server: file I/O, persistent sessions, build/deploy, breadcrumb tracking, reminders, and dead-drop coordination. The `powershell` and `session_run` tools enforce a 4-tier safety blocklist for destructive commands.**
 
-Version 0.3.0 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
+Version 0.3.0 Â· Apache 2.0 Â· [GitHub](https://github.com/AIWander/ops)
 
-**Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** - a multi-agent AI orchestration platform. Related repos: [local](https://github.com/AIWander/local) · [manager](https://github.com/AIWander/manager) · [hands](https://github.com/AIWander/hands) · [workflow](https://github.com/AIWander/workflow) · [cpc-paths](https://github.com/AIWander/cpc-paths) · [cpc-breadcrumbs](https://github.com/AIWander/cpc-breadcrumbs)
+**Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** - a multi-agent AI orchestration platform. Related repos: [local](https://github.com/AIWander/local) Â· [manager](https://github.com/AIWander/manager) Â· [hands](https://github.com/AIWander/hands) Â· [workflow](https://github.com/AIWander/workflow) Â· [cpc-paths](https://github.com/AIWander/cpc-paths) Â· [cpc-breadcrumbs](https://github.com/AIWander/cpc-breadcrumbs)
 
 ---
 
@@ -16,44 +16,52 @@ Version 0.3.0 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
 
 | Feature | Detail |
 |---------|--------|
-| `bash` tool | Execute commands via Git Bash — mirrors `powershell` with `allow_destructive` and `confirm` flags |
+| `bash` tool | Execute commands via Git Bash â€” mirrors `powershell` with `allow_destructive` and `confirm` flags |
 | Extended blocklist | Unix-shaped T4/T3/T2 patterns: dd-to-device, fork bombs, rm -rf root, curl\|sh, chmod 777, mkfs/shred, systemctl, iptables, apt |
-| Path resolution | `OPS_BASH_PATH` env override → standard Git Bash locations → PATH fallback |
+| Path resolution | `OPS_BASH_PATH` env override â†’ standard Git Bash locations â†’ PATH fallback |
 | 69 tools total | +1 from v0.2.1 |
 
 ---
 
 ## Installation
 
-Two binary artifacts ship with each release (installer is manually attached by maintainer after CI):
+Each release ships an Inno Setup wizard. The recommended path is download → double-click → click Next.
 
 | File | Platform | Use |
 |------|----------|-----|
-| `ops-x64.exe` | Windows x64 | Main server binary |
-| `ops-aarch64.exe` | Windows ARM64 | Main server binary |
-| `install-ops-x64.exe` | Windows x64 | Companion installer (recommended for x64) |
+| `install-ops-x64.exe` | Windows x64 | **Recommended** - GUI installer |
+| `install-ops-arm64.exe` | Windows ARM64 | **Recommended** - GUI installer |
+| `ops-x64.exe` | Windows x64 | Standalone server binary, for manual install |
+| `ops-arm64.exe` | Windows ARM64 | Standalone server binary, for manual install |
 
-### Recommended: x64 Windows - use the installer
+### Recommended: download then double-click
 
-1. Download `ops-x64.exe` and `install-ops-x64.exe` from the [latest release](https://github.com/AIWander/ops/releases/latest).
-2. Place both files in the same directory.
-3. Run from a terminal: `install-ops-x64.exe --binary ops-x64.exe`
-4. Follow the prompts - choose `Program Files` (admin) or `LocalAppData` (no admin).
-5. Restart Claude Desktop.
+1. Download `install-ops-x64.exe` (or `install-ops-arm64.exe`) from the [latest release](https://github.com/AIWander/ops/releases/latest).
+2. Double-click it.
+3. Click through the wizard - the default install location (`%LOCALAPPDATA%\Ops`) does not require admin.
 
-The installer:
-- Backs up your `claude_desktop_config.json` with a timestamp before touching it
-- Copies `ops.exe` to the chosen location
+The wizard always copies the path to `ops.exe` to your clipboard. Paste it into any MCP client config:
+
+- **Claude Desktop** - if installed, the wizard auto-registers `ops` in `claude_desktop_config.json` for you. Restart Claude Desktop to pick it up.
+- **Claude Code** - paste into `~/.claude/mcp.json` under `mcpServers.ops.command`.
+- **Codex CLI / Gemini CLI / any other stdio-MCP client** - paste into the equivalent field in that client's config.
+
+If Claude Desktop is **not** installed, the wizard intentionally skips the config edit (no phantom config directories are created) and just leaves the path on the clipboard for you.
+
+The wizard also:
+- Backs up `claude_desktop_config.json` with a timestamp before touching it (only when Claude Desktop is installed)
 - Adds (or updates) only the `ops` entry in `mcpServers` - touches nothing else
-- Prints the backup path to stdout so you can revert if needed
+- Registers itself in Add/Remove Programs, so uninstall is one click. The uninstaller backs up the config again and removes the `ops` entry cleanly.
 
-### Manual: ARM64 Windows (or x64 without the installer)
+The installer does not need to know where Claude Desktop itself is installed. It only writes to `%APPDATA%\Claude\claude_desktop_config.json`, which is the per-user config path Claude Desktop hardcodes regardless of where the .exe lives.
 
-1. Download `ops-aarch64.exe` (or `ops-x64.exe`) and rename it to `ops.exe`.
+### Manual install (no installer)
+
+1. Download `ops-x64.exe` (or `ops-arm64.exe`) and rename it to `ops.exe`.
 2. Place it somewhere permanent, e.g. `%LOCALAPPDATA%\Ops\ops.exe`.
-3. Edit `%APPDATA%\Claude\claude_desktop_config.json` and add:
+3. Edit `%APPDATA%\Claude\claude_desktop_config.json` and add (replace `YourName` with your Windows username):
 
-   ```json
+   ``json
    {
      "mcpServers": {
        "ops": {
@@ -61,27 +69,31 @@ The installer:
        }
      }
    }
-   ```
+   ``
 
 4. Restart Claude Desktop.
-
-ARM64 installer not yet available; it will ship in a v0.2.x patch release.
 
 ### Prerequisites
 
 - Windows 10/11 (x64 or ARM64)
-- Claude Desktop or any MCP-compatible client
+- Claude Desktop, Claude Code, or any other MCP-compatible client
 
 ### Build from Source
 
-```bash
+Building the wizard requires [Inno Setup 6.x](https://jrsoftware.org/isdl.php) on top of the Rust toolchain. The same `ops.exe` is the MCP server *and* the post-install helper that the wizard calls (via the `register` / `unregister` subcommands), so there is only one binary to build.
+
+``powershell
 git clone https://github.com/AIWander/ops.git
 cd ops
 cargo build --release
-```
 
-Binary appears at `target/release/ops.exe`. Requires Rust stable toolchain - nightly is not required.
+# Then compile the GUI installer:
+ISCC.exe /DOpsBinary="`C:\Windows\system32\target\release\ops.exe" `
+         /DArch=x64 /DAppVersion=0.3.0 /DOutputDir="`C:\Windows\system32\dist" `
+         installer\ops.iss
+``
 
+The server binary appears at `target/release/ops.exe`; the wizard at `dist/install-ops-x64.exe`. Requires Rust stable - nightly is not required.
 ---
 
 ## Configuration
