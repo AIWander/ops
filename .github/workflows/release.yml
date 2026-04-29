@@ -10,6 +10,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # Pinned Inno Setup version. Bump intentionally; do not float.
+  INNO_VERSION: "6.4.3"
+  INNO_URL: "https://files.jrsoftware.org/is/6/innosetup-6.4.3.exe"
 
 jobs:
   test:
@@ -19,20 +22,22 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
-        run: cargo test --release --locked
+        run: cargo test --release --locked -p ops
         timeout-minutes: 15
 
   build:
     needs: test
     strategy:
       matrix:
+        # x64 listed first deliberately - it is the most common Windows
+        # configuration and the one we test against locally before tagging.
         include:
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             suffix: x64
           - runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            suffix: aarch64
+            suffix: arm64
       fail-fast: false
     runs-on: ${{ matrix.runner }}
     steps:
@@ -41,19 +46,60 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - name: Build release
+
+      # 1. Build the ops MCP server. The same binary handles `register` and
+      #    `unregister` subcommands that the wizard calls during install.
+      - name: Build ops
         run: cargo build --release --locked --target ${{ matrix.target }}
-      - name: Rename binary
+
+      # 2. Stage the binary under its public, arch-tagged name, so users who
+      #    want manual install can grab it from the release without going
+      #    through the wizard.
+      - name: Stage standalone binary
         shell: pwsh
-        # Binaries are named without a version suffix so install-ops.exe --binary ops-x64.exe
-        # works without knowing the release version. Versioning comes from the GitHub release tag.
         run: |
-          Copy-Item "target/${{ matrix.target }}/release/ops.exe" "ops-${{ matrix.suffix }}.exe"
-      - name: Upload artifact
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/ops.exe" "dist/ops-${{ matrix.suffix }}.exe"
+
+      # 3. Install Inno Setup. The compiler itself is x86 but produces native
+      #    output for any target arch; on the arm64 runner it runs under x86
+      #    emulation, which is fine for packaging.
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $url = "${{ env.INNO_URL }}"
+          Write-Host "Downloading Inno Setup from $url"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\innosetup.exe" -UseBasicParsing
+          Start-Process -FilePath "$env:RUNNER_TEMP\innosetup.exe" `
+            -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-" `
+            -Wait
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+          "${env:ProgramFiles(x86)}\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      # 4. Compile the wizard with the just-built ops.exe baked in.
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          if (-not $version) { $version = "0.3.0" }
+          $opsBin  = (Resolve-Path "target/${{ matrix.target }}/release/ops.exe").Path
+          $outDir  = (Resolve-Path "dist").Path
+          ISCC.exe `
+            "/DOpsBinary=$opsBin" `
+            "/DArch=${{ matrix.suffix }}" `
+            "/DAppVersion=$version" `
+            "/DOutputDir=$outDir" `
+            "installer\ops.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit $LASTEXITCODE" }
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
           name: ops-${{ matrix.suffix }}
-          path: ops-${{ matrix.suffix }}.exe
+          path: |
+            dist/install-ops-${{ matrix.suffix }}.exe
+            dist/ops-${{ matrix.suffix }}.exe
           if-no-files-found: error
           retention-days: 1
 
@@ -78,36 +124,45 @@ jobs:
 
             | File | Platform | Notes |
             |------|----------|-------|
-            | `ops-x64.exe` | Windows x64 | Main server binary |
-            | `ops-aarch64.exe` | Windows ARM64 | Main server binary |
-            | `install-ops-x64.exe` | Windows x64 | **Companion installer** - manually attached after CI |
+            | `install-ops-x64.exe` | Windows x64 | **Recommended** - Inno Setup wizard, double-click to install |
+            | `install-ops-arm64.exe` | Windows ARM64 | **Recommended** - Inno Setup wizard, double-click to install |
+            | `ops-x64.exe` | Windows x64 | Standalone server binary, for manual install |
+            | `ops-arm64.exe` | Windows ARM64 | Standalone server binary, for manual install |
 
-            ### Quick install (x64)
+            ### Quick install
 
-            Download `ops-x64.exe` and `install-ops-x64.exe`, place them in the same directory, then run:
+            Download `install-ops-x64.exe` (or `install-ops-arm64.exe`),
+            double-click it, click Next through the wizard.
 
-            ```
-            install-ops-x64.exe --binary ops-x64.exe
-            ```
+            The installer always copies the path to `ops.exe` to your clipboard,
+            so you can paste it into any MCP client config: Claude Desktop, Claude
+            Code, Codex CLI, Gemini CLI, or any future stdio-MCP client.
 
-            ### Companion installer
+            If Claude Desktop is installed, the wizard additionally:
 
-            `install-ops-x64.exe` is built separately from the `ops-installer` companion crate
-            and manually attached to each release. It backs up your Claude Desktop config,
-            copies `ops.exe` to the chosen location, and registers the server - all in one step.
+            - Backs up `claude_desktop_config.json` with a timestamp before touching it
+            - Adds (or updates) only the `ops` entry in `mcpServers` - touches nothing else
+            - Registers itself in Add/Remove Programs so uninstall is one click
+            - The uninstaller backs up the config again and removes the `ops` entry
 
-            ARM64 installer is not yet available; ARM64 users should edit
-            `claude_desktop_config.json` manually (see `claude_desktop_config.example.json`).
+            If Claude Desktop is not installed, the wizard skips the config edit
+            and leaves the path on the clipboard for you. No phantom directories
+            are created.
+
+            ### Manual install
+
+            Prefer not to run an installer? Download `ops-x64.exe` (or `ops-arm64.exe`),
+            rename it to `ops.exe`, drop it somewhere permanent, then add it to
+            your MCP client's config by hand.
 
             ### Build from source
 
-            ```bash
+            ```powershell
             git clone https://github.com/AIWander/ops.git
             cd ops
             cargo build --release
+            # Then compile the wizard with Inno Setup 6.x:
+            ISCC.exe /DOpsBinary="$pwd\target\release\ops.exe" `
+                     /DArch=x64 /DAppVersion=0.3.0 /DOutputDir="$pwd\dist" `
+                     installer\ops.iss
             ```
-
-            <!-- TODO v0.2.1: automate installer build and attach in this workflow.
-                 The ops-installer crate lives at ops-installer/ in the source repo.
-                 Build with: cargo build --release -p ops-installer
-                 Then upload install-ops-x64.exe as a release asset alongside the main binaries. -->

@@ -1,5 +1,6 @@
 mod agent_identity;
 mod config;
+mod installer;
 pub mod security;
 mod tools;
 
@@ -882,6 +883,18 @@ fn main() {
     if argv.iter().any(|a| a == "--version" || a == "-V") {
         println!("ops 0.3.0");
         return;
+    }
+
+    // Inno Setup invokes `ops.exe register --binary <path>` post-install and
+    // `ops.exe unregister` pre-uninstall. Handle either before falling through
+    // to the MCP stdio loop. Anything else is treated as the normal server.
+    match installer::dispatch(&argv) {
+        Ok(true) => return,                 // subcommand handled
+        Ok(false) => {}                     // fall through to MCP server
+        Err(e) => {
+            eprintln!("ops: {e:#}");
+            std::process::exit(1);
+        }
     }
 
     let server = Server::new();
