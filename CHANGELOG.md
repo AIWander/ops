@@ -1,6 +1,16 @@
 # Changelog
 
-## v0.3.0 — 2026-04-29
+## v0.3.1 - 2026-04-29
+
+### Changed
+
+- **Breadcrumb shape aligned with manager-universal v1.0+ dual-source reader.** Path resolution and JSONL field set updated so that ops breadcrumbs are consumed by manager-universal's dashboard alongside any other source.
+  - Path resolution: 4-tier priority - `OPS_BREADCRUMBS_DIR` (matches manager-universal) -> `OPS_BREADCRUMB_PATH` (legacy, kept) -> `%LOCALAPPDATA%\CPC\ops-data\logs` (default matches manager-universal) -> exe-relative fallback.
+  - Each breadcrumb gets a stable `id` field generated at `start()` time as `bc_{unix_ts}_{slug}`. Required by manager-universal's dedup key.
+  - Each JSONL entry now carries a `status` field: `active` / `complete` / `aborted`. Required by manager-universal's active-filter.
+  - Existing breadcrumb consumers continue to work; new fields are additive.
+
+## v0.3.0 - 2026-04-29
 
 ### Added
 - New `bash` tool — execute commands via Git Bash, mirrors `powershell` semantics with `allow_destructive` and `confirm` flags. Falls back to PATH if Git Bash not at standard location; honors `OPS_BASH_PATH` env override.

@@ -13,6 +13,8 @@ use crate::config::get_config;
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Operation {
+    #[serde(default)]
+    id: String,
     name: String,
     steps: Vec<String>,
     current_step: usize,
@@ -39,17 +41,26 @@ struct StepResult {
 }
 
 /// Resolve breadcrumb root directory using priority order:
-/// 1. OPS_BREADCRUMB_PATH env var
-/// 2. %LOCALAPPDATA%\Ops\breadcrumbs\
-/// 3. {exe_parent}\state\breadcrumbs\
+/// 1. OPS_BREADCRUMBS_DIR env var (matches manager-universal's read path)
+/// 2. OPS_BREADCRUMB_PATH env var (legacy - kept for backward compat)
+/// 3. %LOCALAPPDATA%\CPC\ops-data\logs (matches manager-universal's default for OPS_BREADCRUMBS_DIR)
+/// 4. {exe_parent}\state\breadcrumbs\
 fn breadcrumb_root() -> PathBuf {
+    if let Ok(p) = std::env::var("OPS_BREADCRUMBS_DIR") {
+        let path = PathBuf::from(p);
+        let _ = std::fs::create_dir_all(&path);
+        return path;
+    }
     if let Ok(p) = std::env::var("OPS_BREADCRUMB_PATH") {
         let path = PathBuf::from(p);
         let _ = std::fs::create_dir_all(&path);
         return path;
     }
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
-        let path = PathBuf::from(local).join("Ops").join("breadcrumbs");
+        let path = PathBuf::from(local)
+            .join("CPC")
+            .join("ops-data")
+            .join("logs");
         let _ = std::fs::create_dir_all(&path);
         return path;
     }
@@ -150,7 +161,16 @@ fn safe_operation_slug(name: &str) -> String {
 }
 
 fn log_event(event: &str, op: &Operation, payload: Value) {
+    // status field maps event names to values manager-universal can consume:
+    // "complete" -> "complete", "abort" -> "aborted", all others -> "active"
+    let status = match event {
+        "complete" => "complete",
+        "abort" => "aborted",
+        _ => "active",
+    };
     let entry = json!({
+        "id": op.id,
+        "status": status,
         "event": event,
         "name": op.name,
         "owner": op.owner,
@@ -401,7 +421,10 @@ pub async fn start(args: Value) -> Result<Value> {
     }
 
     let writer = agent_identity::identity_from_args(Some(&args));
+    let unix_ts = chrono::Local::now().timestamp();
+    let op_id = format!("bc_{}_{}", unix_ts, safe_operation_slug(name));
     let op = Operation {
+        id: op_id,
         name: name.to_string(),
         steps: steps.clone(),
         current_step: 0,
