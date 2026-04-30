@@ -881,7 +881,7 @@ fn main() {
     // Without this, `ops.exe --version` hangs waiting for JSON-RPC input.
     let argv: Vec<String> = std::env::args().collect();
     if argv.iter().any(|a| a == "--version" || a == "-V") {
-        println!("ops 0.3.0");
+        println!("ops 0.3.1");
         return;
     }
 
@@ -961,7 +961,7 @@ fn main() {
                     id: request.id,
                     result: json!({
                         "protocolVersion": "2024-11-05",
-                        "serverInfo": {"name": "ops", "version": "0.3.0"},
+                        "serverInfo": {"name": "ops", "version": "0.3.1"},
                         "capabilities": {"tools": {}}
                     }),
                 }

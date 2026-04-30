@@ -11,8 +11,8 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   # Pinned Inno Setup version. Bump intentionally; do not float.
-  INNO_VERSION: "6.4.3"
-  INNO_URL: "https://files.jrsoftware.org/is/6/innosetup-6.4.3.exe"
+  INNO_VERSION: "6.7.0"
+  INNO_URL: "https://github.com/jrsoftware/issrc/releases/download/is-6_7_0/innosetup-6.7.0.exe"
 
 jobs:
   test:
@@ -82,7 +82,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
-          if (-not $version) { $version = "0.3.0" }
+          if (-not $version) { $version = "0.3.1" }
           $opsBin  = (Resolve-Path "target/${{ matrix.target }}/release/ops.exe").Path
           $outDir  = (Resolve-Path "dist").Path
           ISCC.exe `
