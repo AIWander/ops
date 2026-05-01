@@ -1,6 +1,6 @@
 # ops
 
-**One MCP server. Any AI gets hands.**
+**One MCP server. Any AI gets CODEX like abilities.**
 
 ops is a STDIO MCP server that gives any AI client a real, local execution layer on Windows: read and write files, run shell commands, manage persistent sessions, track multi-step operations, install whatever environments your AI needs (Python, ffmpeg, Node, you name it) — all running directly on your computer. Wire ops into Claude Desktop, Cowork, Claude Code, Codex CLI, Gemini CLI, LM Studio, or anything else that speaks STDIO MCP, and your AI gets the kind of hands-on local-agent abilities that closed products like Codex ship as their headline feature. Same idea, but you bring your own AI and your own machine.
 
