@@ -1,16 +1,154 @@
-# ops MCP Server
+# ops
+
+**One MCP server. Any AI gets hands.**
+
+ops is a STDIO MCP server that gives any AI client a real, local execution layer on Windows: read and write files, run shell commands, manage persistent sessions, track multi-step operations, install whatever environments your AI needs (Python, ffmpeg, Node, you name it) — all running directly on your computer. Wire ops into Claude Desktop, Cowork, Claude Code, Codex CLI, Gemini CLI, LM Studio, or anything else that speaks STDIO MCP, and your AI gets the kind of hands-on local-agent abilities that closed products like Codex ship as their headline feature. Same idea, but you bring your own AI and your own machine.
 
 [![CI](https://github.com/AIWander/ops/actions/workflows/ci.yml/badge.svg)](https://github.com/AIWander/ops/actions/workflows/ci.yml)
 
-**Windows operations MCP server: file I/O, persistent sessions, build/deploy, breadcrumb tracking, reminders, and dead-drop coordination. The `powershell` and `session_run` tools enforce a 4-tier safety blocklist for destructive commands.**
+Version 0.3.1 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
 
-Version 0.3.0 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
-
-**Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** - a multi-agent AI orchestration platform. Related repos: [local](https://github.com/AIWander/local) · [manager](https://github.com/AIWander/manager) · [hands](https://github.com/AIWander/hands) · [workflow](https://github.com/AIWander/workflow) · [cpc-paths](https://github.com/AIWander/cpc-paths) · [cpc-breadcrumbs](https://github.com/AIWander/cpc-breadcrumbs)
+**Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** — a multi-agent AI orchestration platform. Companion repos: [hands](https://github.com/AIWander/hands) · [workflow](https://github.com/AIWander/workflow) · [manager](https://github.com/AIWander/manager) · [Voice-Command](https://github.com/AIWander/Voice-Command)
 
 ---
 
-## What's New in v0.3.0
+## 🔒 Stays on your computer
+
+ops runs locally. File reads, shell commands, sessions, breadcrumbs, reminders — all of it happens on your machine. **ops itself never reaches out to the internet on its own.** Your AI may reach out (Claude pings Anthropic, ChatGPT pings OpenAI, etc.), but ops adds zero outbound traffic of its own. If your AI uses ops to *download* something (e.g. `winget install python`), that's the AI's call, executed locally through ops's shell tools.
+
+---
+
+## What you can do with it
+
+Once your AI has ops, it can:
+
+- **Read and write files** on your machine — anywhere you have permission
+- **Run shell commands** in PowerShell or Bash (via Git Bash) with a 4-tier safety blocklist
+- **Hold persistent shell sessions** that remember `cwd`, env vars, and state across calls
+- **Install whatever environments it needs** — `winget install python`, `pip install`, `npm install`, `cargo install`, you name it. If a script needs Python and Python isn't there, your AI can fetch it.
+- **Track multi-step operations** with breadcrumbs that survive context compaction
+- **Set reminders** with natural-language time parsing, including Windows Task Scheduler entries
+- **Manage MCP servers** — backup configs, rebuild binaries, validate setup
+- **Coordinate with other AI sessions** via dead-drop messaging and bag-tagging
+- **Notify you** with toast notifications, read/write the clipboard, kill processes, query SQLite databases
+
+68 tools total across file I/O, transforms, shell, sessions, archives, breadcrumbs, reminders, recovery, build/deploy, MCP server management, and cross-AI coordination. Full inventory below.
+
+---
+
+## Works with
+
+ops speaks STDIO MCP, so it plugs into any AI client that does:
+
+- **Claude** (chat) — Claude Desktop and the web app
+- **Cowork** — Claude's desktop agent
+- **Claude Code** — the CLI coding agent
+- **Codex CLI** — OpenAI / GPT
+- **Gemini CLI** — Google
+- **LM Studio** — for running local models (Llama, Qwen, Mistral, etc.)
+- **Anything else that calls STDIO MCP servers** — the protocol is the only requirement
+
+---
+
+## Install — three paths, in order of effort
+
+### 1. Easiest: one-click installer (Windows x64)
+
+If you're on **Windows x64** and don't want to think about it:
+
+1. Download both `install-ops-x64.exe` and `ops-x64.exe` from the [latest release](https://github.com/AIWander/ops/releases/latest).
+2. Drop both files in the same folder.
+3. Double-click `install-ops-x64.exe` (or run `install-ops-x64.exe --binary ops-x64.exe` from a terminal).
+4. Pick **Program Files** (admin install) or **LocalAppData** (no admin needed).
+5. Restart your AI client.
+
+The installer:
+- Backs up `claude_desktop_config.json` with a timestamp before touching it
+- Copies `ops.exe` to the location you picked
+- Adds (or updates) only the `ops` entry in your MCP config — touches nothing else
+- Prints the backup path so you can revert if anything looks wrong
+
+After restarting, toggle the `ops` connector **on** in **Settings → Connectors** and you're done.
+
+### 2. Have your AI install it for you
+
+If you have **Claude Desktop**, **Cowork**, **Claude Code**, **Codex CLI**, or **Gemini CLI** open and your AI has any kind of file-write or shell access, copy this and paste it to your AI:
+
+> `https://github.com/AIWander/ops` — Can you install this MCP server for me. Grab the right binary for my computer (x64 or ARM64) from the latest release, drop it somewhere sensible, wire it into my MCP client's config (back up the existing config first), and tell me when everything's ready and I need to restart.
+
+Your AI will fetch the right binary, edit the config (with a timestamped backup), and tell you when to restart.
+
+> If your AI doesn't yet have a way to read/write files or run shell commands, use the one-click installer above — that's the bootstrap path.
+
+### 3. Programmer / manual
+
+**ARM64 Windows** (no installer yet — manual is the only path on ARM64):
+
+1. Download `ops-aarch64.exe` from the [latest release](https://github.com/AIWander/ops/releases/latest), rename to `ops.exe`.
+2. Drop it somewhere permanent, e.g. `%LOCALAPPDATA%\Ops\ops.exe`.
+3. Edit `%APPDATA%\Claude\claude_desktop_config.json` and add:
+   ```json
+   {
+     "mcpServers": {
+       "ops": {
+         "command": "C:\\Users\\YourName\\AppData\\Local\\Ops\\ops.exe"
+       }
+     }
+   }
+   ```
+4. Restart Claude Desktop.
+
+**Build from source** (any platform with Rust toolchain):
+
+```bash
+git clone https://github.com/AIWander/ops.git
+cd ops
+cargo build --release
+```
+
+Binary lands at `target/release/ops.exe`. Stable Rust toolchain — no nightly required.
+
+### Prerequisites
+
+- Windows 10 or 11 (x64 or ARM64)
+- A Claude Desktop or other MCP-compatible client
+
+---
+
+## Configuration
+
+| Environment Variable | Default | Purpose |
+|---|---|---|
+| `OPS_BREADCRUMB_PATH` | `%LOCALAPPDATA%\Ops\breadcrumbs\` | Breadcrumb storage |
+| `OPS_SCRIPTS_DIR` | `%LOCALAPPDATA%\Ops\scripts\` | Scripts directory |
+| `OPS_STATE_FILE` | `%LOCALAPPDATA%\Ops\state.json` | State file |
+| `RUST_MCP_DIR` | (none) | Override workspace root for git/build tools |
+| `OPS_BASH_PATH` | auto-discovered | Override Git Bash binary path |
+
+Defaults work without configuration. See `claude_desktop_config.example.json` for a ready-to-paste config block.
+
+---
+
+## Safety: the blocklist
+
+ops's `powershell`, `bash`, and `session_run` tools enforce a 4-tier safety system. All other tools (file I/O, breadcrumbs, reminders, archives, etc.) are unrestricted.
+
+**Tier 4 is strictest (always blocked); Tier 1 is allowed by default.**
+
+| Tier | Trigger | Required flag |
+|------|---------|---------------|
+| 4 — Catastrophic | `Remove-Item C:\`, shadow copy deletion, fork bombs, `dd` to raw devices, `curl \| sh` from network, BitLocker disable, etc. | **Always blocked** |
+| 3 — Destructive | Drive format, account deletion, bulk system-path deletion, `mkfs`/`shred` | `allow_destructive: true` |
+| 2 — System config | Firewall rules, service management, registry writes outside HKCU, scheduled task changes | `confirm: true` |
+| 1 — Everything else | All other commands | Unrestricted |
+
+Full pattern list: [`src/security/blocklist.rs`](src/security/blocklist.rs). Tier descriptions: [SECURITY.md](SECURITY.md).
+
+---
+
+## What's New in v0.3.1
+
+- Aligned breadcrumb shape with manager-universal's dual-source reader — frontends can now render breadcrumbs from ops and manager interchangeably.
 
 ### v0.3.0 highlights
 
@@ -23,81 +161,10 @@ Version 0.3.0 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
 
 ---
 
-## Installation
+## Tool reference
 
-Two binary artifacts ship with each release (installer is manually attached by maintainer after CI):
-
-| File | Platform | Use |
-|------|----------|-----|
-| `ops-x64.exe` | Windows x64 | Main server binary |
-| `ops-aarch64.exe` | Windows ARM64 | Main server binary |
-| `install-ops-x64.exe` | Windows x64 | Companion installer (recommended for x64) |
-
-### Recommended: x64 Windows - use the installer
-
-1. Download `ops-x64.exe` and `install-ops-x64.exe` from the [latest release](https://github.com/AIWander/ops/releases/latest).
-2. Place both files in the same directory.
-3. Run from a terminal: `install-ops-x64.exe --binary ops-x64.exe`
-4. Follow the prompts - choose `Program Files` (admin) or `LocalAppData` (no admin).
-5. Restart Claude Desktop.
-
-The installer:
-- Backs up your `claude_desktop_config.json` with a timestamp before touching it
-- Copies `ops.exe` to the chosen location
-- Adds (or updates) only the `ops` entry in `mcpServers` - touches nothing else
-- Prints the backup path to stdout so you can revert if needed
-
-### Manual: ARM64 Windows (or x64 without the installer)
-
-1. Download `ops-aarch64.exe` (or `ops-x64.exe`) and rename it to `ops.exe`.
-2. Place it somewhere permanent, e.g. `%LOCALAPPDATA%\Ops\ops.exe`.
-3. Edit `%APPDATA%\Claude\claude_desktop_config.json` and add:
-
-   ```json
-   {
-     "mcpServers": {
-       "ops": {
-         "command": "C:\\Users\\YourName\\AppData\\Local\\Ops\\ops.exe"
-       }
-     }
-   }
-   ```
-
-4. Restart Claude Desktop.
-
-ARM64 installer not yet available; it will ship in a v0.2.x patch release.
-
-### Prerequisites
-
-- Windows 10/11 (x64 or ARM64)
-- Claude Desktop or any MCP-compatible client
-
-### Build from Source
-
-```bash
-git clone https://github.com/AIWander/ops.git
-cd ops
-cargo build --release
-```
-
-Binary appears at `target/release/ops.exe`. Requires Rust stable toolchain - nightly is not required.
-
----
-
-## Configuration
-
-| Environment Variable | Default | Purpose |
-|---|---|---|
-| `OPS_BREADCRUMB_PATH` | `%LOCALAPPDATA%\Ops\breadcrumbs\` | Breadcrumb storage directory |
-| `OPS_SCRIPTS_DIR` | `%LOCALAPPDATA%\Ops\scripts\` | Scripts directory |
-| `OPS_STATE_FILE` | `%LOCALAPPDATA%\Ops\state.json` | State file path |
-| `RUST_MCP_DIR` | (none) | Override workspace root for git/build tools |
-
-All env vars are optional. Defaults work without any configuration. See `claude_desktop_config.example.json` for a ready-to-paste config block.
-
----
-
-## Tool Inventory
+<details>
+<summary><strong>Click to expand the full tool inventory (68 tools across 14 categories)</strong></summary>
 
 ### File I/O
 
@@ -172,8 +239,8 @@ All env vars are optional. Defaults work without any configuration. See `claude_
 
 | Tool | Description |
 |------|-------------|
-| `config_backup` | Backup claude_desktop_config.json with a timestamp before editing |
-| `config_validate` | Validate claude_desktop_config.json: parse JSON and check structure |
+| `config_backup` | Backup `claude_desktop_config.json` with a timestamp before editing |
+| `config_validate` | Validate `claude_desktop_config.json`: parse JSON and check structure |
 | `mcp_rebuild` | Rebuild an MCP server with backup |
 
 ### Build/Deploy
@@ -197,6 +264,7 @@ All env vars are optional. Defaults work without any configuration. See `claude_
 | Tool | Description |
 |------|-------------|
 | `powershell` | Execute PowerShell (4-tier blocklist enforced) |
+| `bash` | Execute commands via Git Bash (4-tier blocklist enforced) |
 
 ### Cross-AI
 
@@ -237,61 +305,39 @@ All env vars are optional. Defaults work without any configuration. See `claude_
 | `status` | Check system or topic status |
 | `tool_fallback` | Look up fallback tool when primary is unavailable |
 
-68 tools across 14 categories.
+</details>
 
 ---
 
-## Safety: Command Blocklist
+## Failure modes
 
-`ops` enforces a 4-tier safety system on `powershell` and `session_run`. All other tools (file I/O, breadcrumbs, reminders, archives, etc.) are unrestricted.
+ops is a thin layer over real OS operations, so failures map directly to what the OS would tell you:
 
-**Tier numbering:** 4 is strictest (always blocked), 1 is loosest (allowed by default).
-
-| Tier | Trigger | Required flag |
-|------|---------|---------------|
-| 4 - Catastrophic | `Remove-Item C:\`, shadow copy deletion, boot config destruction, LOLBin execution, etc. | **Always blocked** |
-| 3 - Destructive | Drive format, account deletion, bulk system-path deletion | `allow_destructive: true` |
-| 2 - System config | Firewall rules, service management, registry writes outside HKCU | `confirm: true` |
-| 1 - Everything else | All other commands | Unrestricted |
-
-Full pattern list: `src/security/blocklist.rs`. See [SECURITY.md](SECURITY.md) for tier descriptions.
+- **Blocked command** — `powershell`, `bash`, and `session_run` return an explicit blocklist-tier error with the matched pattern. Adjust the call or pass the appropriate flag.
+- **Command not found / non-zero exit** — tools surface the real exit code and captured stderr. Read the error rather than retrying blindly.
+- **State directory not writable** — usually means `%LOCALAPPDATA%\Ops\` is missing or has wrong permissions. Run `doctor.ps1` to diagnose.
+- **Long-running process hangs** — use `session_*` for commands that need interactive state; `powershell` is best for short one-shots with a hard timeout.
 
 ---
 
-## Failure Modes
+## Pairs nicely with the rest of CPC
 
-`ops` is a thin layer over real OS operations, so failures map directly to what the OS would tell you:
+ops works standalone — one binary, one MCP client, full shell + filesystem + breadcrumbs + reminders. Pair it with these for broader capabilities:
 
-- **Blocked command** - `powershell` and `session_run` return an explicit blocklist-tier error with the matched pattern. Adjust the call or pass the appropriate flag.
-- **Command not found / non-zero exit** - tools surface the real exit code and captured stderr. Read the error rather than retrying blindly.
-- **State directory not writable** - occurs if `%LOCALAPPDATA%\Ops\` is missing or permissions are wrong. Run `doctor.ps1` to diagnose.
-- **Long-running process hangs** - use `session_*` for commands that need interactive state; `powershell` is best for short one-shots with a hard timeout.
-
----
-
-## Compatible With
-
-`ops` is designed to work standalone - one binary, pointed at by one MCP client, and you have shell + filesystem + breadcrumbs + reminders. Pair it with other CPC servers for broader capabilities:
-
-- [local](https://github.com/AIWander/local) - if you need a public, stable server that ships with hooks and a dashboard
-- [manager](https://github.com/AIWander/manager) - multi-backend orchestration on top of ops's execution tools
-- [hands](https://github.com/AIWander/hands) - when a script needs to reach into a browser or Windows UI layer
-- [workflow](https://github.com/AIWander/workflow) - when scripts call APIs you've graduated from browser discovery to stored HTTP patterns
-
-Host clients: Claude Desktop (`claude_desktop_config.json`), Claude Code (`~/.claude/mcp.json`), OpenAI Codex CLI, or Gemini CLI.
+- **[hands](https://github.com/AIWander/hands)** — browser automation, Windows UI control, vision/OCR
+- **[workflow](https://github.com/AIWander/workflow)** — API discovery and replay, credential vault, scheduled flows
+- **[manager](https://github.com/AIWander/manager)** — multi-backend orchestration on top of ops's execution
+- **[Voice-Command](https://github.com/AIWander/Voice-Command)** — voice-control any AI that has ops; pairs cleanly because ops gives the AI hands and Voice-Command gives it ears and a voice
 
 ---
 
 ## Contributing
 
-Issues welcome; PRs considered but this is primarily maintained as part of the CPC stack.
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues welcome; PRs considered, but this is primarily maintained as part of the CPC stack. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache License 2.0 - see [LICENSE](LICENSE).
-
-Copyright 2026 Joseph Wander.
+Apache License 2.0 — see [LICENSE](LICENSE). Copyright 2026 Joseph Wander.
 
 ---
 
