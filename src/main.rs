@@ -876,6 +876,11 @@ fn handle_tool_call(server: &Server, name: &str, params: Value) -> Result<Value,
 // ============================================================================
 
 fn main() {
+    // Orphan-process prevention: kill this process tree when parent dies.
+    if let Err(e) = cpc_paths::process::ensure_kill_on_parent_death() {
+        eprintln!("[warn] job-object setup failed: {e}");
+    }
+
     // Handle --version / -V before entering the MCP stdio loop (Blocker 8).
     // Without this, `ops.exe --version` hangs waiting for JSON-RPC input.
     let argv: Vec<String> = std::env::args().collect();

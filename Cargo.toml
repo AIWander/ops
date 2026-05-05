@@ -25,3 +25,4 @@ anyhow = "1"
 arboard = "3.2"
 rusqlite = { version = "0.39", features = ["bundled"] }
 dirs = "5"
+cpc-paths = { git = "https://github.com/AIWander/cpc-paths", tag = "v0.1.3" }
