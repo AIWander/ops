@@ -50,7 +50,7 @@ jobs:
         run: |
           Copy-Item "target/${{ matrix.target }}/release/ops.exe" "ops-${{ matrix.suffix }}.exe"
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: ops-${{ matrix.suffix }}
           path: ops-${{ matrix.suffix }}.exe
