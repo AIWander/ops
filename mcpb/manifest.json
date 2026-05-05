@@ -1,0 +1,44 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "ops",
+  "display_name": "CPC Ops",
+  "version": "0.3.1",
+  "description": "Windows shell + filesystem + git automation for Claude",
+  "long_description": "CPC Ops provides PowerShell/Bash execution, filesystem operations, git workflows, and system utilities. It serves as the primary execution server for lightweight Claude Desktop sessions on Windows.",
+  "author": {
+    "name": "AIWander",
+    "url": "https://github.com/AIWander/ops"
+  },
+  "homepage": "https://github.com/AIWander/ops",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AIWander/ops"
+  },
+  "license": "MIT",
+  "keywords": ["mcp", "claude", "cpc", "powershell", "bash", "filesystem", "git"],
+  "server": {
+    "type": "binary",
+    "entry_point": "server/ops.exe",
+    "mcp_config": {
+      "command": "${__dirname}/server/ops.exe",
+      "args": [],
+      "env": {
+        "VOLUMES_PATH": "${user_config.volumes_path}"
+      }
+    }
+  },
+  "user_config": {
+    "volumes_path": {
+      "type": "directory",
+      "title": "Volumes path",
+      "description": "Where CPC knowledge base lives",
+      "default": "${HOME}/Documents/Volumes",
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["win32"]
+  }
+}
