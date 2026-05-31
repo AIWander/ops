@@ -9,3 +9,6 @@ Thumbs.db
 .idea/
 .vscode/
 .env
+
+# build-verification target dirs (alternate CARGO_TARGET_DIR runs)
+target-verify*/
