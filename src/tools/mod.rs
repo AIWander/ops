@@ -17,6 +17,13 @@ pub mod sessions;
 pub mod sqlite;
 pub mod utils;
 pub mod xforms;
+// Execution-parity port (from local + Programmer-Wander)
+pub mod fileops;
+pub mod http;
+pub mod psession;
+pub mod recovery;
+pub mod smart;
+pub mod webhook;
 
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
@@ -306,6 +313,13 @@ pub fn get_definitions() -> Vec<Value> {
     defs.extend(utils::get_definitions());
     defs.extend(sqlite::get_definitions());
     defs.extend(config_ops::get_definitions());
+    // Execution-parity port
+    defs.extend(http::get_definitions());
+    defs.extend(webhook::get_definitions());
+    defs.extend(psession::get_definitions());
+    defs.extend(recovery::get_definitions());
+    defs.extend(smart::get_definitions());
+    defs.extend(fileops::get_definitions());
 
     defs
 }
@@ -414,8 +428,16 @@ pub fn execute(name: &str, args: &Value) -> Option<Value> {
         | "transform_file_stats" => Some(xforms::execute(name, &a)),
 
         // Sessions
-        "session_create" | "session_run" | "session_cd" | "session_set_env" | "session_get_env"
-        | "session_list" | "session_destroy" => Some(sessions::execute(name, &a)),
+        "session_create"
+        | "session_run"
+        | "session_cd"
+        | "session_set_env"
+        | "session_get_env"
+        | "session_list"
+        | "session_destroy"
+        | "session_checkpoint"
+        | "session_recover"
+        | "session_read_output" => Some(sessions::execute(name, &a)),
 
         // Utilities (ported from local)
         "clipboard_read" | "clipboard_write" | "notify" | "kill_process" | "list_process"
@@ -426,6 +448,62 @@ pub fn execute(name: &str, args: &Value) -> Option<Value> {
 
         // Config ops (ported from local)
         "config_backup" | "config_validate" => Some(config_ops::execute(name, &a)),
+
+        // HTTP client (ported from local)
+        "http_request" | "http_fetch" | "http_scrape" | "http_download" => {
+            Some(http::execute(name, &a))
+        }
+
+        // Webhooks (ported from Programmer-Wander; async via shared runtime)
+        "webhook_start" => Some(
+            RT.block_on(webhook::start_webhook_server(a))
+                .unwrap_or_else(err_val),
+        ),
+        "webhook_stop" => Some(
+            RT.block_on(webhook::stop_webhook_server(a))
+                .unwrap_or_else(err_val),
+        ),
+        "webhook_list" => Some(
+            RT.block_on(webhook::list_webhook_servers())
+                .unwrap_or_else(err_val),
+        ),
+        "webhook_add_route" => Some(
+            RT.block_on(webhook::add_webhook_route(a))
+                .unwrap_or_else(err_val),
+        ),
+
+        // Persistent PowerShell/WSL sessions (ported from local)
+        "psession_create" | "psession_run" | "psession_destroy" | "psession_list"
+        | "psession_read" | "psession_history" => Some(psession::execute(name, &a)),
+
+        // Recovery store (ported from local raw.rs + PW config.rs)
+        "recovery_status"
+        | "recovery_resume"
+        | "recovery_clear"
+        | "session_recovery_status"
+        | "session_recover_data"
+        | "session_resume_op"
+        | "session_clear_recovery" => Some(recovery::execute(name, &a)),
+
+        // Smart routing (ported from local)
+        "smart_exec" | "smart_read" => Some(smart::execute(name, &a)),
+
+        // File ops (ported from Programmer-Wander file.rs + search.rs)
+        "copy_file" | "move_file" | "create_dir" | "get_file_info" | "edit_block" | "grep"
+        | "diff_file" | "file_stats" | "extract_lines" | "search_start" => {
+            Some(fileops::execute(name, &a))
+        }
+
+        // Extended transforms (ported from local transforms.rs + PW transform.rs)
+        "transform_json_minify"
+        | "transform_base64_encode"
+        | "transform_base64_decode"
+        | "transform_csv_to_json"
+        | "transform_json_to_csv"
+        | "transform_bulk_rename"
+        | "transform_scaffold"
+        | "transform_sync_dir"
+        | "transform_file" => Some(xforms::execute(name, &a)),
 
         _ => None,
     }

@@ -250,6 +250,40 @@ pub fn get_definitions() -> Vec<Value> {
                 "required": ["session"]
             }
         }),
+        json!({
+            "name": "session_checkpoint",
+            "description": "Save session state (cwd, env, history) to a checkpoint file for crash recovery.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "session": { "type": "string", "description": "Session name (default: 'default')" },
+                    "checkpoint_path": { "type": "string", "description": "Path to save checkpoint (default: C:/temp/session_{name}.checkpoint)" }
+                }
+            }
+        }),
+        json!({
+            "name": "session_recover",
+            "description": "Recover a session from a checkpoint file (respawns a PowerShell process with restored cwd/env/history).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "checkpoint_path": { "type": "string", "description": "Path to checkpoint file" }
+                },
+                "required": ["checkpoint_path"]
+            }
+        }),
+        json!({
+            "name": "session_read_output",
+            "description": "Read buffered output from a session without blocking. Use for long-running commands.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "session": { "type": "string", "description": "Session name" },
+                    "lines": { "type": "integer", "description": "Max lines to return (default: all)" },
+                    "clear": { "type": "boolean", "description": "Clear buffer after reading (default: true)" }
+                }
+            }
+        }),
     ]
 }
 
@@ -262,6 +296,9 @@ pub fn execute(name: &str, args: &Value) -> Value {
         "session_get_env" => session_getenv(args),
         "session_list" => session_list(args),
         "session_destroy" => session_destroy(args),
+        "session_checkpoint" => session_checkpoint(args),
+        "session_recover" => session_recover(args),
+        "session_read_output" => session_read_output(args),
         _ => json!({"error": format!("Unknown session tool: {}", name)}),
     }
 }
@@ -438,4 +475,158 @@ fn session_destroy(args: &Value) -> Value {
         Some(_) => json!({"success": true, "destroyed": session_name}),
         None => json!({"success": false, "error": format!("Session '{}' not found", session_name)}),
     }
+}
+
+/// Save session state to checkpoint file for crash recovery.
+fn session_checkpoint(args: &Value) -> Value {
+    let session_name = args["session"].as_str().unwrap_or("default").to_string();
+    let default_path = format!("C:/temp/session_{}.checkpoint", session_name);
+    let checkpoint_path = args["checkpoint_path"].as_str().unwrap_or(&default_path);
+
+    let sessions = SESSIONS.lock().unwrap();
+    let session = match sessions.get(&session_name) {
+        Some(s) => s,
+        None => return json!({"error": format!("Session '{}' not found", session_name)}),
+    };
+
+    let checkpoint = json!({
+        "session_name": session_name,
+        "cwd": session.cwd,
+        "env": session.env,
+        "history": session.history,
+        "saved_at": chrono::Utc::now().to_rfc3339(),
+    });
+
+    if let Some(parent) = std::path::Path::new(checkpoint_path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    match std::fs::write(
+        checkpoint_path,
+        serde_json::to_string_pretty(&checkpoint).unwrap_or_default(),
+    ) {
+        Ok(_) => json!({
+            "success": true,
+            "checkpoint_path": checkpoint_path,
+            "session": session_name,
+            "commands_saved": session.history.len()
+        }),
+        Err(e) => json!({"error": format!("Failed to write checkpoint: {}", e)}),
+    }
+}
+
+/// Recover a session from a checkpoint file (respawns a PowerShell process).
+fn session_recover(args: &Value) -> Value {
+    let checkpoint_path = match args["checkpoint_path"].as_str() {
+        Some(p) => p,
+        None => return json!({"error": "checkpoint_path required"}),
+    };
+
+    let checkpoint_data = match std::fs::read_to_string(checkpoint_path) {
+        Ok(data) => data,
+        Err(e) => return json!({"error": format!("Failed to read checkpoint: {}", e)}),
+    };
+
+    let checkpoint: Value = match serde_json::from_str(&checkpoint_data) {
+        Ok(v) => v,
+        Err(e) => return json!({"error": format!("Invalid checkpoint format: {}", e)}),
+    };
+
+    let session_name = checkpoint["session_name"]
+        .as_str()
+        .unwrap_or("recovered")
+        .to_string();
+    let cwd = checkpoint["cwd"].as_str().unwrap_or("C:\\").to_string();
+
+    let mut env: HashMap<String, String> = HashMap::new();
+    if let Some(saved_env) = checkpoint["env"].as_object() {
+        for (k, v) in saved_env {
+            if let Some(val) = v.as_str() {
+                env.insert(k.clone(), val.to_string());
+            }
+        }
+    }
+
+    let mut history: Vec<String> = Vec::new();
+    if let Some(saved_history) = checkpoint["history"].as_array() {
+        for item in saved_history {
+            if let Some(cmd) = item.as_str() {
+                history.push(cmd.to_string());
+            }
+        }
+    }
+
+    let mut cmd = Command::new("powershell");
+    cmd.args(["-NoLogo", "-NoProfile", "-Command", "-"])
+        .current_dir(&cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => return json!({"error": format!("Failed to spawn PowerShell: {}", e)}),
+    };
+
+    let output_buffer = Arc::new(Mutex::new(Vec::new()));
+    if let Some(stdout) = child.stdout.take() {
+        start_output_reader(stdout, output_buffer.clone());
+    }
+
+    let session = PersistentSession {
+        name: session_name.clone(),
+        child,
+        output_buffer,
+        cwd,
+        env,
+        history,
+        created_at: chrono::Utc::now().to_rfc3339(),
+    };
+
+    let mut sessions = SESSIONS.lock().unwrap();
+    sessions.insert(session_name.clone(), session);
+
+    json!({
+        "success": true,
+        "session": session_name,
+        "recovered_from": checkpoint_path,
+        "saved_at": checkpoint["saved_at"],
+        "commands_restored": checkpoint["history"].as_array().map(|a| a.len()).unwrap_or(0)
+    })
+}
+
+/// Read buffered output without blocking - for long-running commands.
+fn session_read_output(args: &Value) -> Value {
+    let session_name = args["session"].as_str().unwrap_or("default").to_string();
+    let max_lines = args["lines"].as_u64().map(|n| n as usize);
+    let clear = args["clear"].as_bool().unwrap_or(true);
+
+    let sessions = SESSIONS.lock().unwrap();
+    let session = match sessions.get(&session_name) {
+        Some(s) => s,
+        None => return json!({"error": format!("Session '{}' not found", session_name)}),
+    };
+
+    let mut buffer = session.output_buffer.lock().unwrap();
+
+    let output: Vec<String> = if let Some(limit) = max_lines {
+        buffer.iter().rev().take(limit).rev().cloned().collect()
+    } else {
+        buffer.clone()
+    };
+
+    let line_count = output.len();
+
+    if clear {
+        buffer.clear();
+    }
+
+    json!({
+        "session": session_name,
+        "output": output.join("\n"),
+        "lines": line_count,
+        "cleared": clear
+    })
 }
