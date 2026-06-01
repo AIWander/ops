@@ -231,10 +231,7 @@ fn get_file_info(args: &Value) -> Value {
 }
 
 fn edit_block(args: &Value) -> Value {
-    let path = args
-        .get("file_path")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let path = args.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
     let old_str = args
         .get("old_string")
         .and_then(|v| v.as_str())

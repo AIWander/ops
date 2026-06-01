@@ -428,8 +428,15 @@ pub fn execute(name: &str, args: &Value) -> Option<Value> {
         | "transform_file_stats" => Some(xforms::execute(name, &a)),
 
         // Sessions
-        "session_create" | "session_run" | "session_cd" | "session_set_env" | "session_get_env"
-        | "session_list" | "session_destroy" | "session_checkpoint" | "session_recover"
+        "session_create"
+        | "session_run"
+        | "session_cd"
+        | "session_set_env"
+        | "session_get_env"
+        | "session_list"
+        | "session_destroy"
+        | "session_checkpoint"
+        | "session_recover"
         | "session_read_output" => Some(sessions::execute(name, &a)),
 
         // Utilities (ported from local)
@@ -470,10 +477,13 @@ pub fn execute(name: &str, args: &Value) -> Option<Value> {
         | "psession_read" | "psession_history" => Some(psession::execute(name, &a)),
 
         // Recovery store (ported from local raw.rs + PW config.rs)
-        "recovery_status" | "recovery_resume" | "recovery_clear" | "session_recovery_status"
-        | "session_recover_data" | "session_resume_op" | "session_clear_recovery" => {
-            Some(recovery::execute(name, &a))
-        }
+        "recovery_status"
+        | "recovery_resume"
+        | "recovery_clear"
+        | "session_recovery_status"
+        | "session_recover_data"
+        | "session_resume_op"
+        | "session_clear_recovery" => Some(recovery::execute(name, &a)),
 
         // Smart routing (ported from local)
         "smart_exec" | "smart_read" => Some(smart::execute(name, &a)),
@@ -485,11 +495,15 @@ pub fn execute(name: &str, args: &Value) -> Option<Value> {
         }
 
         // Extended transforms (ported from local transforms.rs + PW transform.rs)
-        "transform_json_minify" | "transform_base64_encode" | "transform_base64_decode"
-        | "transform_csv_to_json" | "transform_json_to_csv" | "transform_bulk_rename"
-        | "transform_scaffold" | "transform_sync_dir" | "transform_file" => {
-            Some(xforms::execute(name, &a))
-        }
+        "transform_json_minify"
+        | "transform_base64_encode"
+        | "transform_base64_decode"
+        | "transform_csv_to_json"
+        | "transform_json_to_csv"
+        | "transform_bulk_rename"
+        | "transform_scaffold"
+        | "transform_sync_dir"
+        | "transform_file" => Some(xforms::execute(name, &a)),
 
         _ => None,
     }

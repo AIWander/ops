@@ -637,8 +637,8 @@ fn bulk_rename(args: &Value) -> Value {
         None => return json!({"error": "replacement required"}),
     };
     // Accept either `execute=true` (local) or `dry_run=false` (PW) semantics.
-    let execute = args["execute"].as_bool().unwrap_or(false)
-        || !args["dry_run"].as_bool().unwrap_or(true);
+    let execute =
+        args["execute"].as_bool().unwrap_or(false) || !args["dry_run"].as_bool().unwrap_or(true);
 
     let re = match regex::Regex::new(pattern) {
         Ok(r) => r,
