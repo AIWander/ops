@@ -60,16 +60,41 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # keyless cosign signing via Sigstore OIDC
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v5
         with:
           path: dist
           merge-multiple: true
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Sign binaries + checksums (keyless / Sigstore)
+        working-directory: dist
+        # Produces <file>.sig (signature) + <file>.pem (certificate) for each binary
+        # and SHA256SUMS. Verify with:
+        #   cosign verify-blob --certificate <f>.pem --signature <f>.sig \
+        #     --certificate-identity-regexp 'https://github.com/AIWander/ops/.*' \
+        #     --certificate-oidc-issuer https://token.actions.githubusercontent.com <f>
+        run: |
+          for f in *.exe SHA256SUMS; do
+            cosign sign-blob --yes "$f" \
+              --output-signature "$f.sig" \
+              --output-certificate "$f.pem"
+          done
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.exe
+          files: |
+            dist/*.exe
+            dist/SHA256SUMS
+            dist/*.sig
+            dist/*.pem
           draft: true
           prerelease: false
           fail_on_unmatched_files: true
@@ -81,6 +106,20 @@ jobs:
             | `ops-x64.exe` | Windows x64 | Main server binary |
             | `ops-aarch64.exe` | Windows ARM64 | Main server binary |
             | `install-ops-x64.exe` | Windows x64 | **Companion installer** - manually attached after CI |
+            | `SHA256SUMS` | — | Checksums for every binary |
+            | `*.sig` / `*.pem` | — | Sigstore (keyless cosign) signature + certificate per file |
+
+            ### Verifying the download
+
+            Check integrity: `sha256sum -c SHA256SUMS`. Verify authenticity (signed by this
+            repo's GitHub Actions, no key to manage):
+
+            ```bash
+            cosign verify-blob --certificate ops-x64.exe.pem --signature ops-x64.exe.sig \
+              --certificate-identity-regexp 'https://github.com/AIWander/ops/.*' \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              ops-x64.exe
+            ```
 
             ### Quick install (x64)
 
