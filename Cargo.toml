@@ -28,5 +28,5 @@ dirs = "5"
 cpc-paths = { git = "https://github.com/AIWander/cpc-paths", tag = "v0.1.3" }
 # Execution-parity port deps
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
-base64 = "0.21"
+base64 = "0.22"
 walkdir = "2"
