@@ -1,6 +1,6 @@
 # ops
 
-**One MCP server. Any AI gets CODEX like abilities.**
+**One MCP server. Give any AI local files, shells, and persistent sessions.**
 
 ops is a STDIO MCP server that gives any AI client a real, local execution layer on Windows: read and write files, run shell commands, manage persistent sessions, track multi-step operations, install whatever environments your AI needs (Python, ffmpeg, Node, you name it) — all running directly on your computer. Wire ops into Claude Desktop, Cowork, Claude Code, Codex CLI, Gemini CLI, LM Studio, or anything else that speaks STDIO MCP, and your AI gets the kind of hands-on local-agent abilities that closed products like Codex ship as their headline feature. Same idea, but you bring your own AI and your own machine.
 
@@ -8,7 +8,7 @@ ops is a STDIO MCP server that gives any AI client a real, local execution layer
 
 Version 0.3.1 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
 
-**Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** — a multi-agent AI orchestration platform. Companion repos: [hands](https://github.com/AIWander/hands) · [workflow](https://github.com/AIWander/workflow) · [manager](https://github.com/AIWander/manager) · [Voice-Command](https://github.com/AIWander/Voice-Command)
+**Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** — a multi-agent AI orchestration platform. Companion repos: [AI-Hands](https://github.com/AIWander/AI-Hands) · [workflow](https://github.com/AIWander/workflow) · [manager-universal](https://github.com/AIWander/manager-universal) (manager/dashboard Beta and coming soon) · [Voice-Command](https://github.com/AIWander/Voice-Command)
 
 ---
 
@@ -324,9 +324,9 @@ ops is a thin layer over real OS operations, so failures map directly to what th
 
 ops works standalone — one binary, one MCP client, full shell + filesystem + breadcrumbs + reminders. Pair it with these for broader capabilities:
 
-- **[hands](https://github.com/AIWander/hands)** — browser automation, Windows UI control, vision/OCR
+- **[AI-Hands](https://github.com/AIWander/AI-Hands)** — browser automation, Windows UI control, vision/OCR
 - **[workflow](https://github.com/AIWander/workflow)** — API discovery and replay, credential vault, scheduled flows
-- **[manager](https://github.com/AIWander/manager)** — multi-backend orchestration on top of ops's execution
+- **[manager-universal](https://github.com/AIWander/manager-universal)** — manager/dashboard Beta and coming soon; current repository is a test surface
 - **[Voice-Command](https://github.com/AIWander/Voice-Command)** — voice-control any AI that has ops; pairs cleanly because ops gives the AI hands and Voice-Command gives it ears and a voice
 
 ---
