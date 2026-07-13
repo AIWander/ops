@@ -344,5 +344,5 @@ Apache License 2.0 — see [LICENSE](LICENSE). Copyright 2026 Joseph Wander.
 ## Contact
 
 - **GitHub:** [github.com/AIWander](https://github.com/AIWander/)
-- **Email:** protipsinc@gmail.com
+- **Email:** contact@aiwander.ai
 - **Issues:** [github.com/AIWander/ops/issues](https://github.com/AIWander/ops/issues)
