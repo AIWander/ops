@@ -8,7 +8,7 @@ ops is a STDIO MCP server that gives any AI client a real, local execution layer
 
 Version 0.3.1 · Apache 2.0 · [GitHub](https://github.com/AIWander/ops)
 
-**Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** — a multi-agent AI orchestration platform. Companion repos: [AI-Hands](https://github.com/AIWander/AI-Hands) · [workflow](https://github.com/AIWander/workflow) · [manager-universal](https://github.com/AIWander/manager-universal) (manager/dashboard Beta and coming soon) · [Voice-Command](https://github.com/AIWander/Voice-Command)
+**Part of [CPC](https://github.com/AIWander) (Copy Paste Compute)** — a multi-agent AI orchestration platform. Companion repos: [AI-Hands](https://github.com/AIWander/AI-Hands) · [manager-universal](https://github.com/AIWander/manager-universal) (manager/dashboard Beta and coming soon) · [Voice-Command](https://github.com/AIWander/Voice-Command)
 
 ---
 
@@ -325,7 +325,6 @@ ops is a thin layer over real OS operations, so failures map directly to what th
 ops works standalone — one binary, one MCP client, full shell + filesystem + breadcrumbs + reminders. Pair it with these for broader capabilities:
 
 - **[AI-Hands](https://github.com/AIWander/AI-Hands)** — browser automation, Windows UI control, vision/OCR
-- **[workflow](https://github.com/AIWander/workflow)** — API discovery and replay, credential vault, scheduled flows
 - **[manager-universal](https://github.com/AIWander/manager-universal)** — manager/dashboard Beta and coming soon; current repository is a test surface
 - **[Voice-Command](https://github.com/AIWander/Voice-Command)** — voice-control any AI that has ops; pairs cleanly because ops gives the AI hands and Voice-Command gives it ears and a voice
 
