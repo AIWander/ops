@@ -1,6 +1,6 @@
 [package]
 name = "ops"
-version = "0.3.0"
+version = "0.3.2"
 edition = "2021"
 description = "Windows operations MCP server - file I/O, sessions, build/deploy, breadcrumbs, reminders for Claude Desktop"
 license = "Apache-2.0"
